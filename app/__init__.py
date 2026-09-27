@@ -31,6 +31,26 @@ def _secret_key(data_dir):
         return fh.read().strip()
 
 
+def _add_missing_columns(db):
+    """Tiny forward-only migration: add columns that newer versions define to existing tables."""
+    from sqlalchemy import inspect, text
+
+    insp = inspect(db.engine)
+    with db.engine.begin() as conn:
+        for table in db.metadata.sorted_tables:
+            existing = {c["name"] for c in insp.get_columns(table.name)}
+            for col in table.columns:
+                if col.name in existing:
+                    continue
+                ddl = f'ALTER TABLE "{table.name}" ADD COLUMN "{col.name}" {col.type.compile(db.engine.dialect)}'
+                default = col.default.arg if col.default is not None and not callable(col.default.arg) else None
+                if isinstance(default, str):
+                    ddl += " DEFAULT '" + default.replace("'", "''") + "'"
+                elif isinstance(default, (bool, int)):
+                    ddl += f" DEFAULT {int(default)}"
+                conn.execute(text(ddl))
+
+
 def create_app(test_config=None):
     app = Flask(__name__)
     data_dir = os.path.abspath(os.environ.get("ERP_DATA_DIR", os.path.join(BASE_DIR, "data")))
@@ -58,6 +78,7 @@ def create_app(test_config=None):
 
     with app.app_context():
         db.create_all()
+        _add_missing_columns(db)
 
     from .i18n import init_i18n
     from .web import init_web

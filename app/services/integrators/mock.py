@@ -13,6 +13,7 @@ class MockIntegrator(Integrator):
         "e-Fatura user; TCKNs are not. Use this for training, then switch to your real integrator."
     )
     live = False
+    capabilities = {"efatura", "earsiv", "lookup", "status", "cancel"}
 
     def test_connection(self):
         return "Sandbox is always reachable."

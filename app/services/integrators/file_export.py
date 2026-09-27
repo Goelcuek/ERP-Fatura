@@ -6,7 +6,7 @@ integrator portal accepts UBL-TR XML uploads. Status is then updated by hand.
 
 import os
 
-from .base import Integrator, IntegratorError, SendResult, StatusResult, ConfigField
+from .base import ConfigField, Integrator, IntegratorError, SendResult, StatusResult
 
 
 class FileExportIntegrator(Integrator):
@@ -20,6 +20,7 @@ class FileExportIntegrator(Integrator):
         ConfigField("folder", "Export folder", default="", help="Leave empty to use data/outbox"),
     ]
     live = False
+    capabilities = {"efatura", "earsiv", "cancel"}
 
     def _folder(self):
         folder = self.config.get("folder") or os.path.join(self.data_dir or ".", "outbox")

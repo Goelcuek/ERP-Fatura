@@ -30,6 +30,11 @@ def extract():
 
     for table in (STATUS_LABELS, PROFILE_LABELS, TYPE_LABELS, KIND_LABELS, UNITS):
         found.update(table.values())
+    from app.services.integrators.base import CAPABILITIES, XmlOptions
+
+    found.update(CAPABILITIES.values())
+    found.update(XmlOptions.LABELS.values())
+    found.update(["Test", "Production"])
     for cls in REGISTRY.values():
         found.update([cls.label, cls.description])
         for f in cls.fields:
@@ -44,9 +49,10 @@ def indirect_messages():
     """Messages raised as exceptions and translated where they are displayed."""
     pat = re.compile(r"""(?:raise \w+Error\(|errors\.append\(|message=)\s*f?(["'])(.+?)\1""")
     out = set()
-    for rel in ("app/services/ubl.py", "app/services/invoicing.py", "app/services/backup.py",
-                "app/services/integrators/mock.py", "app/services/integrators/file_export.py",
-                "app/services/integrators/nilvera.py", "app/services/integrators/base.py"):
+    integ_dir = os.path.join(ROOT, "app", "services", "integrators")
+    rels = ["app/services/ubl.py", "app/services/invoicing.py", "app/services/backup.py"]
+    rels += [f"app/services/integrators/{f}" for f in sorted(os.listdir(integ_dir)) if f.endswith(".py")]
+    for rel in rels:
         with open(os.path.join(ROOT, rel), encoding="utf-8") as fh:
             for line in fh:
                 m = pat.search(line)

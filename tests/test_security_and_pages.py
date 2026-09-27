@@ -98,3 +98,24 @@ def test_every_page_renders_with_demo_data(tmp_path):
         for u in urls:
             r = c.get(u)
             assert r.status_code == 200, (lang, u, r.status_code)
+
+
+def test_old_database_gets_new_columns(tmp_path):
+    import sqlite3
+
+    from app import create_app
+
+    d = tmp_path / "old"
+    app = create_app({"TESTING": True, "DATA_DIR": str(d)})
+    with app.app_context():
+        db.session.remove()
+        db.engine.dispose()
+    con = sqlite3.connect(d / "erp.db")
+    con.execute("ALTER TABLE invoice DROP COLUMN sent_xml_path")
+    con.commit()
+    assert "sent_xml_path" not in [r[1] for r in con.execute("PRAGMA table_info(invoice)")]
+    con.close()
+    app = create_app({"TESTING": True, "DATA_DIR": str(d)})
+    con = sqlite3.connect(d / "erp.db")
+    assert "sent_xml_path" in [r[1] for r in con.execute("PRAGMA table_info(invoice)")]
+    con.close()

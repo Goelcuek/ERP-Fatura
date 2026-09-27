@@ -6,7 +6,8 @@ current documentation with a test account (apitest.nilvera.com) before going liv
 
 import requests
 
-from .base import Alias, ConfigField, Integrator, IntegratorError, SendResult, StatusResult
+from .base import (DEBUG_FIELD, Alias, ConfigField, Integrator, IntegratorError, SendResult, StatusResult,
+                   XmlOptions, map_status)
 
 
 class NilveraIntegrator(Integrator):
@@ -14,13 +15,19 @@ class NilveraIntegrator(Integrator):
     label = "Nilvera (REST API)"
     description = "Sends e-Fatura and e-Arşiv invoices through the Nilvera REST API using an API key."
     live = True
+    verified = False
+    capabilities = {"efatura", "earsiv", "lookup", "status", "cancel"}
+    # Nilvera applies its own invoice template unless one is embedded; e-Arşiv type is set by the endpoint
+    xml_defaults = XmlOptions(embed_xslt=False, earsiv_sending_type=True)
     fields = [
         ConfigField("environment", "Environment", kind="select", default="test", options=["test", "production"]),
         ConfigField("api_key", "API key", kind="password", help="Nilvera portal → Settings → API"),
         ConfigField("sender_alias", "Sender alias (GB)", default="", help="Optional. Your gönderici birim etiketi"),
+        ConfigField("url_default", "API base URL (optional)"),
+        DEBUG_FIELD,
     ]
 
-    BASE_URLS = {"test": "https://apitest.nilvera.com", "production": "https://api.nilvera.com"}
+    URLS = {"test": {"default": "https://apitest.nilvera.com"}, "production": {"default": "https://api.nilvera.com"}}
     PATH_CHECK_USER = "/general/GlobalCompany/Check/TaxNumber/{tax_id}"
     PATH_COMPANY = "/general/Company"
     PATH_SEND_EFATURA = "/einvoice/Send/Xml"
@@ -30,15 +37,11 @@ class NilveraIntegrator(Integrator):
     PATH_CANCEL_EARSIV = "/earchive/Invoices/Cancel"
     TIMEOUT = 30
 
-    def __init__(self, config=None, data_dir=None, session=None):
-        super().__init__(config, data_dir)
-        self.http = session or requests.Session()
-
     # -- helpers ------------------------------------------------------------
 
     @property
     def base_url(self):
-        return self.BASE_URLS.get(self.config.get("environment"), self.BASE_URLS["test"])
+        return self.url().rstrip("/")
 
     def _headers(self):
         key = (self.config.get("api_key") or "").strip()
@@ -47,10 +50,12 @@ class NilveraIntegrator(Integrator):
         return {"Authorization": f"Bearer {key}", "Accept": "application/json"}
 
     def _request(self, method, path, **kw):
+        self.log(f"→ {method} {path}", repr({k: v for k, v in kw.items() if k != "files"}))
         try:
             resp = self.http.request(method, self.base_url + path, headers=self._headers(), timeout=self.TIMEOUT, **kw)
         except requests.RequestException as e:
             raise IntegratorError(f"Cannot reach integrator: {e}")
+        self.log(f"← {resp.status_code}", resp.text or "")
         if resp.status_code == 401:
             raise IntegratorError("Integrator rejected the API key (401).")
         if resp.status_code >= 400:
@@ -84,6 +89,7 @@ class NilveraIntegrator(Integrator):
         return out
 
     def send(self, invoice, xml, receiver_alias=""):
+        self.ensure_supported(invoice)
         earsiv = invoice.profile == "EARSIVFATURA"
         path = self.PATH_SEND_EARSIV if earsiv else self.PATH_SEND_EFATURA
         params = {}
@@ -103,17 +109,9 @@ class NilveraIntegrator(Integrator):
         data = self._request("GET", path.format(uuid=invoice.uuid))
         if not isinstance(data, dict):
             return StatusResult(status=invoice.status, message=str(data or ""))
-        code = str(data.get("StatusCode") or data.get("Status") or "").lower()
+        code = str(data.get("StatusCode") or data.get("Status") or "")
         detail = data.get("StatusDetail") or data.get("Message") or code
-        if any(k in code for k in ("reject", "red")):
-            return StatusResult("rejected", detail)
-        if any(k in code for k in ("error", "hata", "fail")):
-            return StatusResult("error", detail)
-        if any(k in code for k in ("cancel", "iptal")):
-            return StatusResult("cancelled", detail)
-        if any(k in code for k in ("accept", "kabul", "succeed", "success", "1300", "approved")):
-            return StatusResult("accepted", detail)
-        return StatusResult("sent", detail)
+        return StatusResult(map_status(code), detail)
 
     def cancel(self, invoice):
         if not invoice.is_earsiv:

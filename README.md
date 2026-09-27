@@ -7,7 +7,8 @@ A self-hosted web application for a medium-sized **power-tool repair workshop** 
 - **Customers & suppliers** (cari hesaplar): VKN/TCKN validation, one-click GİB e-Fatura registration check, account
   statements (ekstre) with running balance.
 - **e-Fatura / e-Arşiv**: generates **UBL-TR 1.2** XML (TEMELFATURA, TICARIFATURA, EARSIVFATURA; SATIŞ, İADE,
-  TEVKİFAT, İSTİSNA), GİB-format numbering (`EFT2026000000001`), sends through a pluggable **integrator adapter**.
+  TEVKİFAT, İSTİSNA), GİB-format numbering (`EFT2026000000001`), and sends it through the integrator of your choice
+  (EDM, İzibiz, Logo, Nilvera, QNB eFinans, Sovos, Uyumsoft, or manual XML upload), adapting the XML to each one.
 - **Bookkeeping** (ön muhasebe): cash/bank/POS accounts, collections and payments, transfers, expenses with deductible
   VAT, monthly profit & VAT report, CSV exports for the accountant (mali müşavir).
 - **Parts & stock**: parts catalogue with stock that is deducted automatically when an invoice is issued, low-stock
@@ -83,32 +84,83 @@ From the command line: `flask --app app backup [--dest D:\Yedek]`, `flask --app 
 ## e-Fatura integration
 
 Turkish e-invoices must be delivered to GİB through a licensed **special integrator** (özel entegratör). This app
-creates the invoice XML; the integrator signs it with the company's seal (mali mühür) and delivers it. The
-integrator is chosen in **Settings → e-Invoice integrator**:
+creates the invoice XML; the integrator signs it with the company's seal (mali mühür) and delivers it. Pick the
+integrator in **Settings → e-Invoice integrator**:
 
-| Adapter | What it does |
+| Integrator | Transport | e-Fatura | e-Arşiv | GİB lookup | Status | e-Arşiv cancel |
+|---|---|:-:|:-:|:-:|:-:|:-:|
+| **Sandbox** (default) | none — simulated, for training | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Manual XML export** | writes XML to a folder, upload in any integrator's portal | ✓ | ✓ | – | manual | ✓ |
+| **EDM Bilişim** | SOAP `EFaturaEDM.svc`, session login | ✓ | ✓ | ✓ | ✓ | – |
+| **İzibiz** | SOAP `AuthenticationWS` / `EInvoiceWS` / `EIArchiveWS` | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Logo eLogo** | SOAP `PostBoxService`, session login, zipped UBL | ✓ | ✓ | ✓ | ✓ | – |
+| **Nilvera** | REST, API key | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **QNB eSolutions (eFinans)** | SOAP `connectorService` + `EarsivWebService`, WS-Security | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Sovos (Foriba)** | SOAP `ClientEInvoiceServices` (`sendUBL`), HTTP Basic | ✓ | – | – | ✓ | – |
+| **Uyumsoft** | SOAP `Services/Integration`, WS-Security | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+A "–" means the adapter does not implement it yet; the app says so clearly (and e.g. suggests manual export for
+Sovos e-Arşiv invoices) instead of failing silently. Other integrators (Turkcell e-Şirket, Mysoft, Digital Planet,
+Veriban, Kolaysoft…) work today through **Manual XML export**; a direct adapter is one small file (see below).
+
+### How the XML is adapted per integrator
+
+Every integrator accepts UBL-TR, but they differ in details. The app therefore keeps two files per invoice:
+
+1. **Canonical XML** — built once when the invoice is issued. This is the business record and never changes.
+2. **Sent XML** — produced right before sending by applying the chosen integrator's *XML profile*, and stored
+   exactly as sent (`data/files/invoices/<number>_<uuid>.<integrator>.xml`). The invoice's *XML* button downloads it.
+
+The profile covers the differences that matter in practice, each preset per integrator and overridable in
+Settings under *XML adjustments*:
+
+| Option | Why it differs |
 |---|---|
-| **Sandbox** | Simulates an integrator, sends nothing. For training and demos. Default. |
-| **Manual XML export** | Writes each issued invoice as UBL-TR XML to a folder. Upload it in *any* integrator's web portal (including the one the shop uses today), then mark the invoice as sent. Works immediately, no API needed. |
-| **Nilvera (REST API)** | Sends e-Fatura / e-Arşiv invoices through Nilvera's REST API with an API key; checks GİB registration of customers; queries status; cancels e-Arşiv. |
+| Embed invoice display template (XSLT) | GİB, portals and the receiver show the invoice through an XSLT embedded in the XML. The app ships its own template (`app/services/xslt/invoice.xslt`); integrators that apply their own design can skip it. |
+| e-Arşiv delivery type in the XML | Some integrators read the e-Arşiv *gönderim şekli* from the XML (`AdditionalDocumentReference` / `SendingType`), others from API fields (Uyumsoft `EArchiveInvoiceInfo`, İzibiz `EARSIV_PROPERTIES`). |
+| ETTN upper case | Case of the invoice UUID. |
+| Indented XML | Some parsers dislike whitespace between elements. |
+
+Adapters can also change the XML tree in code (`customize_xml`) and choose the packaging (raw, base64,
+zipped + MD5 hash, or embedded in the SOAP body), which each adapter does according to its API.
+*As the recipient sees it* on an invoice renders the sent XML with its embedded template.
 
 ### Before going live — please read
 
-- **Verify the API adapter with the integrator's test account first.** The Nilvera endpoint paths are gathered in one
-  place (`app/services/integrators/nilvera.py`, `PATH_*` constants) and are covered by unit tests with a fake HTTP
-  session, but they have **not** been exercised against Nilvera's live test service. Run *Save & test connection* and
-  send a few test invoices on `apitest.nilvera.com` before switching to production.
-- **Which integrator does the shop use today?** If it is not Nilvera, either use *Manual XML export* right away, or
-  add an adapter: subclass `Integrator` in `app/services/integrators/` (implement `check_user`, `send`, `get_status`,
-  `cancel`) and register it in `integrators/__init__.py`. Most integrators (Uyumsoft, QNB eFinans, Logo, İzibiz,
-  EDM, Sovos…) accept the same UBL-TR XML; only the transport differs.
-- **Invoice series.** Set the 3-character e-Fatura / e-Arşiv series in *Settings → Invoicing* to what is registered
-  at the integrator. If the shop switches mid-year and keeps its series, enter the next sequence number after the last
-  invoice the old program issued ("start from number"), so numbering continues without gaps or duplicates.
-- The generated XML follows the UBL 2.1 element order and UBL-TR conventions (VKN/TCKN party identification, KDV
-  0015 tax scheme, withholding codes, e-Arşiv sending type, İADE billing reference). It is not run through GİB's
-  official schematron here — the integrator validates it on submission and returns readable errors, which the app
-  shows on the invoice together with a *Rebuild XML* action.
+The adapters were written from the integrators' published method names and common usage, **not tested against their
+live test services** (this development environment could not reach them). They are marked **Unverified** in the
+settings. Their request building and response parsing are covered by tests with a simulated server, but real
+services may name a field or namespace differently. For the integrator the shop uses:
+
+1. Get a **test account** from the integrator (Uyumsoft publishes one: `Uyumsoft` / `Uyumsoft`).
+2. In Settings choose the integrator, environment *Test*, enter the credentials, tick *Log requests and responses*,
+   and press **Save & test connection**.
+3. Check a customer's e-Fatura status and send a few test invoices (e-Fatura and e-Arşiv).
+4. If something fails, `data/logs/integrator-YYYY-MM.log` contains every request and response (passwords removed).
+   The fix is usually a one-line change in `app/services/integrators/<integrator>.py`; service addresses can be
+   changed in Settings without code.
+5. Switch to *Production*, turn logging off, and set the invoice series and starting number (Settings → Invoicing).
+
+### Adding an integrator
+
+Subclass `Integrator` in `app/services/integrators/` and register it in `integrators/__init__.py`:
+
+```python
+class MyIntegrator(Integrator):
+    key, label = "mine", "My Integrator"
+    capabilities = {"efatura", "earsiv", "lookup", "status"}
+    xml_defaults = XmlOptions(embed_xslt=True, earsiv_sending_type=False)
+    URLS = {"test": {"default": "https://…"}, "production": {"default": "https://…"}}
+    fields = [ENV_FIELD, ConfigField("username", "Username"), ConfigField("password", "Password", kind="password"),
+              DEBUG_FIELD]
+
+    def check_user(self, tax_id): ...          # -> [Alias(...)]
+    def send(self, invoice, xml, receiver_alias=""): ...   # -> SendResult
+    def get_status(self, invoice): ...         # -> StatusResult
+```
+
+`soap.py` provides envelope / WS-Security / fault helpers; `self.soap_call(...)` handles transport and logging.
+Settings and translations pick the new adapter up automatically (add its strings to `translations_tr.py`).
 
 ## Accounting scope
 
@@ -144,7 +196,8 @@ app/
   services/calc.py          # invoice arithmetic (Decimal, half-up rounding)
   services/ubl.py           # UBL-TR XML builder + business validation
   services/invoicing.py     # draft → issued → sent/accepted lifecycle, numbering, stock
-  services/integrators/     # integrator adapters (sandbox, manual export, Nilvera)
+  services/integrators/     # integrator adapters + SOAP helpers
+  services/ubl_profile.py   # per-integrator XML adaptation, XSLT embedding and rendering
   services/backup.py        # backup / restore / scheduler
   routes/                   # Flask blueprints
   templates/, static/       # server-rendered UI, no build step, no CDN (works offline)

@@ -4,33 +4,79 @@
 {% block subheading %}{{ _('Choose how invoices reach GİB.') }}{% endblock %}
 {% block settings %}
 <div class="alert alert-info" style="margin-bottom:16px">{{ icon('info') }}<div class="body"><b>{{ _('How e-invoicing works') }}</b>
-  <p>{{ _('This app creates the UBL-TR invoice XML. A GİB-licensed special integrator (özel entegratör) signs it with your company seal and delivers it. You can keep the integrator you already have: use its API if supported, or export XML and upload it in its portal.') }}</p></div></div>
-<form method="post" class="card">
+  <p>{{ _('This app creates the UBL-TR invoice XML. A GİB-licensed special integrator (özel entegratör) signs it with your company seal and delivers it. You can keep the integrator you already have: use its API if supported, or export XML and upload it in its portal.') }}</p>
+  <p>{{ _('Each integrator gets the XML in the form it expects: the app adapts the invoice (display template, e-Arşiv delivery info, formatting) right before sending and keeps a copy of exactly what was sent.') }}</p></div></div>
+
+<form method="post" class="card" data-integ-form>
   <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
-  <div class="card-body option-cards">
+  <div class="card-head"><div><h2>{{ _('Integrator') }}</h2><div class="sub">{{ _('The selected one is used for all new sends.') }}</div></div></div>
+  <div class="card-body integ-grid">
     {% for key, cls in registry.items() %}
-    <label class="option-card" style="display:block">
-      <div style="display:flex;gap:12px">
-        <input type="radio" name="integrator" value="{{ key }}" {{ 'checked' if current == key }} data-integ>
-        <span style="flex:1"><b>{{ _(cls.label) }} {% if cls.live %}<span class="tag blue">API</span>{% endif %}{% if current == key %} <span class="tag green">{{ _('Active') }}</span>{% endif %}</b><p>{{ _(cls.description) }}</p></span>
-      </div>
-      {% if cls.fields %}
-      <div class="form-row" data-integ-fields="{{ key }}" style="margin:14px 0 0 28px">
-        {% for f in cls.fields %}{% set val = configs.get(key, {}).get(f.name, f.default) %}
-        <div class="field"><label>{{ _(f.label) }}</label>
-          {% if f.kind == 'select' %}<select name="{{ key }}__{{ f.name }}">{% for opt in f.options %}<option value="{{ opt }}" {{ 'selected' if val == opt }}>{{ opt }}</option>{% endfor %}</select>
-          {% elif f.kind == 'password' %}<input type="password" name="{{ key }}__{{ f.name }}" placeholder="{{ '••••••••  ' ~ _('(saved — leave empty to keep)') if val else '' }}" autocomplete="off">
-          {% else %}<input type="text" name="{{ key }}__{{ f.name }}" value="{{ val }}">{% endif %}
-          {% if f.help %}<div class="hint">{{ _(f.help) }}</div>{% endif %}</div>
-        {% endfor %}
-      </div>
-      {% endif %}
+    <label class="option-card integ-card">
+      <input type="radio" name="integrator" value="{{ key }}" {{ 'checked' if shown == key }} data-integ>
+      <span style="flex:1;min-width:0">
+        <b>{{ _(cls.label) }}
+          {% if current == key %}<span class="tag green">{{ _('Active') }}</span>{% endif %}
+          {% if cls.live and not cls.verified %}<span class="tag amber" title="{{ _('Implemented from public information; not yet tested against this integrator\'s live test service.') }}">{{ _('Unverified') }}</span>{% endif %}
+        </b>
+        <span class="caps">{% for cap, name in capabilities.items() %}{% if cap in cls.capabilities %}<span class="tag">{{ _(name) }}</span>{% endif %}{% endfor %}</span>
+      </span>
     </label>
     {% endfor %}
   </div>
+
+  {% for key, cls in registry.items() %}
+  {% set inst = instances[key] %}
+  {% set cfg = configs.get(key, {}) %}
+  <div class="integ-panel {{ '' if shown == key else 'hidden' }}" data-integ-panel="{{ key }}">
+    <div class="form-section">
+      <div class="intro"><h3>{{ _(cls.label) }}</h3><p>{{ _(cls.description) }}</p>
+        {% if cls.live and not cls.verified %}<p style="color:var(--warning)">{{ _('Before going live: run “Save & test connection” with a test account and send a few test invoices. Turn on request logging if something fails — the log shows exactly what was exchanged.') }}</p>{% endif %}
+      </div>
+      <div>
+        {% if cls.fields %}
+        <div class="form-row">
+          {% for f in cls.fields %}{% set val = cfg.get(f.name, f.default) %}
+          {% if f.kind == 'checkbox' %}
+          <label class="check span-2"><input type="checkbox" name="{{ key }}__{{ f.name }}" value="1" {{ 'checked' if val == '1' }}>
+            <span>{{ _(f.label) }}{% if f.help %}<small>{{ _(f.help) }}</small>{% endif %}</span></label>
+          {% else %}
+          <div class="field"><label>{{ _(f.label) }}</label>
+            {% if f.kind == 'select' %}<select name="{{ key }}__{{ f.name }}">{% for opt in f.options %}<option value="{{ opt }}" {{ 'selected' if val == opt }}>{{ _(opt|capitalize) }}</option>{% endfor %}</select>
+            {% elif f.kind == 'password' %}<input type="password" name="{{ key }}__{{ f.name }}" placeholder="{{ '••••••••  ' ~ _('(saved — leave empty to keep)') if val else '' }}" autocomplete="off">
+            {% else %}<input type="text" name="{{ key }}__{{ f.name }}" value="{{ val }}" {% if f.name.startswith('url_') %}class="mono" placeholder="{{ inst.url(f.name[4:]) if not val else '' }}"{% endif %}>{% endif %}
+            {% if f.help %}<div class="hint">{{ _(f.help) }}</div>{% endif %}</div>
+          {% endif %}
+          {% endfor %}
+        </div>
+        {% else %}<p class="muted small">{{ _('No settings needed.') }}</p>{% endif %}
+      </div>
+    </div>
+    <div class="form-section">
+      <div class="intro"><h3>{{ _('XML adjustments') }}</h3><p>{{ _('Preset for this integrator. Change only if the integrator asks for it.') }}</p></div>
+      <div>
+        {% set opts = inst.xml_options() %}
+        {% for name in xml_fields %}
+        <label class="check"><input type="checkbox" name="{{ key }}__xml_{{ name }}" value="1" {{ 'checked' if opts[name] }}>
+          <span>{{ _(xml_labels[name]) }}{% if opts[name] != cls.xml_defaults[name] %} <span class="tag amber">{{ _('changed') }}</span>{% endif %}</span></label>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
   <div class="form-actions">
     <button class="btn" name="test" value="1">{{ icon('plug') }} {{ _('Save & test connection') }}</button>
-    <button class="btn btn-primary">{{ _('Save') }}</button>
+    <button class="btn btn-primary">{{ _('Save & use this integrator') }}</button>
   </div>
 </form>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const f = document.querySelector("[data-integ-form]");
+  f.querySelectorAll("[data-integ]").forEach((r) => r.addEventListener("change", () => {
+    f.querySelectorAll("[data-integ-panel]").forEach((p) => p.classList.toggle("hidden", p.dataset.integPanel !== r.value));
+  }));
+})();
+</script>
 {% endblock %}

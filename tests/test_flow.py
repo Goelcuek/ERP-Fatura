@@ -193,3 +193,54 @@ def test_numbering_can_continue_from_previous_system(app, ctx):
     Setting.set("invoice.efatura_start", 158)
     assert next_invoice_number("TICARIFATURA", 2026) == "EFT2026000000158"
     assert next_invoice_number("EARSIVFATURA", 2026) == "ARS2026000000001"
+
+
+def test_integrator_choice_changes_sent_xml(app, client, tmp_path):
+    from app.models import Setting
+
+    with app.app_context():
+        c = Contact(name="Ali Veli", tax_id="10000000146", is_company=False, district="A", city="B")
+        db.session.add(c)
+        db.session.commit()
+        cid = c.id
+    # choose manual export into a temp folder, with the XSLT embedding switched off
+    r = client.post("/settings/integrator", data={"integrator": "file", "file__folder": str(tmp_path / "out"),
+                                                  "file__xml_earsiv_sending_type": "1", "file__xml_uppercase_uuid": "1"})
+    assert r.status_code == 302
+    with app.app_context():
+        cfg = Setting.get("integrator.config")["file"]
+        assert cfg["xml_embed_xslt"] == "0" and "xml_earsiv_sending_type" not in cfg  # only deviations stored
+        assert Setting.get("integrator.name") == "file"
+    data = {"contact_id": cid, "profile": "EARSIVFATURA", "type_code": "SATIS", "action": "issue_send"}
+    data.update(lines_form(("Bakım", "1", "100", None)))
+    client.post("/invoices/new", data=data)
+    with app.app_context():
+        inv = Invoice.query.one()
+        assert inv.status == "exported" and inv.integrator == "file"
+        sent = open(os.path.join(app.config["DATA_DIR"], inv.sent_xml_path), "rb").read()
+        canonical = open(os.path.join(app.config["DATA_DIR"], inv.xml_path), "rb").read()
+        exported = (tmp_path / "out" / f"{inv.number}.xml").read_bytes()
+        assert exported == sent and b">XSLT<" not in sent and b"SendingType" in sent
+        assert b">XSLT<" not in canonical
+    r = client.get(f"/invoices/{inv.id}/render")
+    assert r.status_code == 200 and "e-ARŞİV FATURA" in r.get_data(as_text=True)
+    assert client.get(f"/invoices/{inv.id}/xml").data == sent
+    assert client.get("/settings/integrator").status_code == 200
+    assert client.get("/settings/integrator?show=izibiz").status_code == 200
+
+
+def test_unsupported_profile_is_reported(app, client):
+    with app.app_context():
+        from app.models import Setting
+
+        Setting.set("integrator.name", "sovos")
+        c = Contact(name="Ali Veli", tax_id="10000000146", is_company=False, district="A", city="B")
+        db.session.add(c)
+        db.session.commit()
+        cid = c.id
+    data = {"contact_id": cid, "profile": "EARSIVFATURA", "type_code": "SATIS", "action": "issue_send"}
+    data.update(lines_form(("Bakım", "1", "100", None)))
+    client.post("/invoices/new", data=data)
+    with app.app_context():
+        inv = Invoice.query.one()
+        assert inv.status == "error" and "Elle XML" in inv.status_message

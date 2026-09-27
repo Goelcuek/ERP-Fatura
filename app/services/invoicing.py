@@ -44,12 +44,14 @@ def xml_dir():
     return d
 
 
-def read_xml(inv):
-    if inv.xml_path:
-        path = os.path.join(current_app.config["DATA_DIR"], inv.xml_path)
-        if os.path.exists(path):
-            with open(path, "rb") as fh:
-                return fh.read()
+def read_xml(inv, sent=False):
+    """Canonical XML, or with sent=True the integrator-specific version if one was sent."""
+    for rel in ([inv.sent_xml_path] if sent else []) + [inv.xml_path]:
+        if rel:
+            path = os.path.join(current_app.config["DATA_DIR"], rel)
+            if os.path.exists(path):
+                with open(path, "rb") as fh:
+                    return fh.read()
     return None
 
 
@@ -118,7 +120,14 @@ def send(inv, user=None):
     integ = get_integrator()
     uid = user.id if user else None
     try:
-        res = integ.send(inv, xml, receiver_alias=inv.contact.efatura_alias or "")
+        integ.ensure_supported(inv)
+        # adapt the canonical XML to this integrator's dialect and keep exactly what was sent
+        payload = integ.prepare_xml(xml, inv)
+        rel = os.path.join("files", "invoices", f"{inv.number}_{inv.uuid}.{integ.key}.xml")
+        with open(os.path.join(current_app.config["DATA_DIR"], rel), "wb") as fh:
+            fh.write(payload)
+        inv.sent_xml_path = rel
+        res = integ.send(inv, payload, receiver_alias=inv.contact.efatura_alias or "")
     except IntegratorError as e:
         inv.status = "error"
         inv.status_message = str(e)

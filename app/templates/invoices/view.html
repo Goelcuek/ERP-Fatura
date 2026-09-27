@@ -12,6 +12,7 @@
   <div class="actions">
     <a class="btn" href="{{ url_for('invoices.print_view', iid=inv.id) }}" target="_blank">{{ icon('printer') }} {{ _('Print') }}</a>
     <a class="btn" href="{{ url_for('invoices.xml', iid=inv.id) }}">{{ icon('code') }} {{ _('XML preview') if inv.is_draft else _('XML') }}</a>
+    {% if not inv.is_draft %}<a class="btn" href="{{ url_for('invoices.render', iid=inv.id) }}" target="_blank">{{ icon('external') }} {{ _('As the recipient sees it') }}</a>{% endif %}
     {% if inv.is_draft %}
       <a class="btn" href="{{ url_for('invoices.edit', iid=inv.id) }}">{{ icon('edit') }} {{ _('Edit') }}</a>
       <form method="post" action="{{ url_for('invoices.issue', iid=inv.id) }}" class="inline">{{ csrf() }}<input type="hidden" name="send" value="1">
@@ -123,7 +124,7 @@
         <dl class="dl" style="grid-template-columns: 110px 1fr">
           <dt>ETTN</dt><dd class="mono small">{{ inv.uuid|upper }}</dd>
           <dt>{{ _('Receiver alias') }}</dt><dd class="mono small">{{ inv.contact.efatura_alias or '—' }}</dd>
-          <dt>{{ _('Integrator') }}</dt><dd>{{ inv.integrator or '—' }}</dd>
+          <dt>{{ _('Integrator') }}</dt><dd>{{ _(INTEGRATOR_LABELS.get(inv.integrator, inv.integrator)) if inv.integrator else '—' }}</dd>
           <dt>{{ _('Reference') }}</dt><dd class="mono small">{{ inv.integrator_ref or '—' }}</dd>
           <dt>{{ _('Sent at') }}</dt><dd>{{ inv.sent_at|dt or '—' }}</dd>
           {% if inv.return_ref_number %}<dt>{{ _('Returned invoice') }}</dt><dd class="mono small">{{ inv.return_ref_number }}</dd>{% endif %}

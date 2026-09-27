@@ -1,5 +1,6 @@
 import os
 import tempfile
+from dataclasses import fields
 
 from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, send_file, url_for
 from werkzeug.utils import secure_filename
@@ -8,7 +9,7 @@ from ..extensions import db
 from ..i18n import LANGUAGES, _
 from ..models import Setting, User
 from ..services import backup as backup_svc
-from ..services.integrators import REGISTRY, IntegratorError
+from ..services.integrators import CAPABILITIES, REGISTRY, IntegratorError, XmlOptions
 from ..web import admin_required
 from . import f_bool, f_int, f_str
 
@@ -80,10 +81,21 @@ def integrator():
         cls = REGISTRY[key]
         cfg = dict(all_cfg.get(key, {}))
         for fld in cls.fields:
-            val = request.form.get(f"{key}__{fld.name}", "")
+            name = f"{key}__{fld.name}"
+            if fld.kind == "checkbox":
+                cfg[fld.name] = "1" if request.form.get(name) else "0"
+                continue
+            val = request.form.get(name, "")
             if fld.kind == "password" and not val:
                 continue  # keep stored secret when the field is left blank
             cfg[fld.name] = val.strip()
+        # XML options: store only deviations from the integrator's defaults
+        for opt in fields(XmlOptions):
+            chosen = bool(request.form.get(f"{key}__xml_{opt.name}"))
+            if chosen == getattr(cls.xml_defaults, opt.name):
+                cfg.pop("xml_" + opt.name, None)
+            else:
+                cfg["xml_" + opt.name] = "1" if chosen else "0"
         all_cfg[key] = cfg
         Setting.set("integrator.config", all_cfg)
         Setting.set("integrator.name", key)
@@ -91,14 +103,19 @@ def integrator():
         if request.form.get("test") == "1":
             try:
                 msg = cls(config=cfg, data_dir=current_app.config["DATA_DIR"]).test_connection()
-                flash(_("Connection OK: {msg}", msg=msg), "success")
+                flash(_("Connection OK: {msg}", msg=_(msg)), "success")
             except IntegratorError as e:
                 flash(_("Connection failed: {err}", err=_(str(e))), "error")
         else:
             flash(_("Integrator settings saved."), "success")
-        return redirect(url_for("settings.integrator"))
-    return render_template("settings/integrator.html", registry=REGISTRY, current=Setting.get("integrator.name"),
-                           configs=all_cfg, section="integrator")
+        return redirect(url_for("settings.integrator", show=key))
+    current = Setting.get("integrator.name") or "mock"
+    instances = {k: cls(config=all_cfg.get(k, {}), data_dir=current_app.config["DATA_DIR"])
+                 for k, cls in REGISTRY.items()}
+    return render_template("settings/integrator.html", registry=REGISTRY, instances=instances, current=current,
+                           shown=request.args.get("show") if request.args.get("show") in REGISTRY else current,
+                           configs=all_cfg, xml_fields=[f.name for f in fields(XmlOptions)],
+                           xml_labels=XmlOptions.LABELS, capabilities=CAPABILITIES, section="integrator")
 
 
 @bp.route("/users")

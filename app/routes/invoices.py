@@ -309,7 +309,7 @@ def pay(iid):
 @bp.route("/<int:iid>/xml")
 def xml(iid):
     inv = _get(iid)
-    data = invoicing.read_xml(inv)
+    data = invoicing.read_xml(inv, sent=True)
     if data is None:
         if not inv.is_draft:
             abort(404)
@@ -320,6 +320,18 @@ def xml(iid):
         db.session.rollback()
     return Response(data, mimetype="application/xml",
                     headers={"Content-Disposition": f'attachment; filename="{inv.number or inv.uuid}.xml"'})
+
+
+@bp.route("/<int:iid>/render")
+def render(iid):
+    """The invoice as receivers see it: the XML rendered with its embedded display template."""
+    from ..services.ubl_profile import render_html
+
+    inv = _get(iid)
+    data = invoicing.read_xml(inv, sent=True)
+    if data is None:
+        abort(404)
+    return Response(render_html(data), mimetype="text/html")
 
 
 @bp.route("/<int:iid>/print")

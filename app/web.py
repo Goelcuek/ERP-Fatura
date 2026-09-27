@@ -183,7 +183,10 @@ def init_web(app):
         bytes=fmt_bytes,
         reldays=rel_days,
     )
+    from .services.integrators import REGISTRY
+
     app.jinja_env.globals.update(
+        INTEGRATOR_LABELS={k: c.label for k, c in REGISTRY.items()},
         csrf_token=csrf_token,
         status_badge=status_badge,
         icon=icon,

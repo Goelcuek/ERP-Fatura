@@ -367,7 +367,8 @@ class Invoice(db.Model):
     integrator_ref = db.Column(db.String(120), default="")
     status_message = db.Column(db.Text, default="")
     sent_at = db.Column(db.DateTime)
-    xml_path = db.Column(db.String(300), default="")
+    xml_path = db.Column(db.String(300), default="")  # canonical UBL-TR, frozen when issued
+    sent_xml_path = db.Column(db.String(300), default="")  # as adapted for and sent to the integrator
     created_by_id = db.Column(db.Integer, db.ForeignKey("user.id"))
     created_at = db.Column(db.DateTime, nullable=False, default=now)
     updated_at = db.Column(db.DateTime, nullable=False, default=now, onupdate=now)

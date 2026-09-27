@@ -127,7 +127,7 @@ def _withholding(b, parent, vat_base, withheld, rate, code, reason):
     b.cbc(scheme, "TaxTypeCode", code)
 
 
-def build_invoice_xml(inv, company, *, xslt=None):
+def build_invoice_xml(inv, company):
     """Return UBL-TR XML bytes for an Invoice model instance.
 
     `company` is the settings group dict returned by Setting.group("company").
@@ -188,18 +188,6 @@ def build_invoice_xml(inv, company, *, xslt=None):
         b.cbc(adr, "IssueDate", inv.issue_date.isoformat())
         b.cbc(adr, "DocumentTypeCode", "SendingType")
         b.cbc(adr, "DocumentType", "ELEKTRONIK")
-
-    if xslt:
-        adr = b.cac(root, "AdditionalDocumentReference")
-        b.cbc(adr, "ID", inv.uuid.upper())
-        b.cbc(adr, "IssueDate", inv.issue_date.isoformat())
-        b.cbc(adr, "DocumentType", "XSLT")
-        att = b.cac(adr, "Attachment")
-        import base64
-
-        b.cbc(att, "EmbeddedDocumentBinaryObject", base64.b64encode(xslt).decode(),
-              characterSetCode="UTF-8", encodingCode="Base64", filename=f"{inv.number}.xslt",
-              mimeCode="application/xml")
 
     # Signature block (the integrator applies the actual XAdES signature)
     sig = b.cac(root, "Signature")
