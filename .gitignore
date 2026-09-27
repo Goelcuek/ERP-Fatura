@@ -8,3 +8,7 @@ data/
 *.db
 *.db-wal
 *.db-shm
+# bundled Ollama and build output (scripts/build_bundle.py)
+vendor/
+build/
+dist/

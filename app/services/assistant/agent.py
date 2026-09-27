@@ -18,11 +18,12 @@ from ...models import ServiceOrder, Setting
 from ...web import STATUS_LABELS
 from .. import workshop
 from ..branding import company_name
-from . import commands, tools
+from . import commands, ollama, tools
 from .llm import LLMError, OpenAICompatibleBackend
 
 NOT_UNDERSTOOD = ("I did not understand that. Try for example: “SRV-2026-00012 is ready”, “I finished this job”, "
                   "“waiting for parts”, “add note: customer will pick up on Friday”.")
+STILL_DOWNLOADING = "The AI model is still downloading ({percent}%). Workshop commands such as “I finished this job” already work."
 MAX_STEPS = 6
 HISTORY_LIMIT = 16  # messages kept for the model; small models do better with short context
 
@@ -56,12 +57,20 @@ FROM_STATUSES = {
 def settings():
     s = Setting.group("assistant")
     s.update({f"voice_{k}": v for k, v in Setting.group("voice").items()})
+    mgr = ollama.manager()
+    s["bundled"] = mgr.bundled
+    s["effective_base_url"] = mgr.bundled_url() if (s["server"] == "auto" and mgr.bundled) else s["base_url"]
     return s
+
+
+def model_status(cfg=None):
+    cfg = cfg or settings()
+    return ollama.manager().status(ollama.api_root(cfg["effective_base_url"]), cfg["model"])
 
 
 def backend(cfg=None):
     cfg = cfg or settings()
-    return OpenAICompatibleBackend(cfg["base_url"], cfg["model"], api_key=cfg.get("api_key", ""),
+    return OpenAICompatibleBackend(cfg["effective_base_url"], cfg["model"], api_key=cfg.get("api_key", ""),
                                    timeout=int(cfg.get("timeout") or 120),
                                    temperature=float(cfg.get("temperature") or 0.2))
 
@@ -320,6 +329,14 @@ class Session:
         return [{"role": "system", "content": self._system()}] + msgs
 
     def _run_llm(self):
+        dl = ollama.manager().download.snapshot()
+        if dl["state"] == "downloading":
+            self.say(_(STILL_DOWNLOADING, percent=dl["percent"]))
+            return
+        cfg = settings()
+        mgr = ollama.manager()
+        if cfg["bundled"] and cfg["server"] == "auto" and not mgr.running(ollama.api_root(cfg["effective_base_url"])):
+            mgr.start(wait=20)  # the bundled server stopped (e.g. after sleep): bring it back
         specs = tools.specs()
         for _step in range(MAX_STEPS):
             try:

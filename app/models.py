@@ -1,4 +1,5 @@
 import json
+import os
 import uuid as uuidlib
 from datetime import date, datetime
 from decimal import Decimal
@@ -80,7 +81,9 @@ class Setting(db.Model):
         "integrator.config": {},
         "assistant.enabled": True,
         "assistant.use_llm": True,
-        "assistant.base_url": "http://127.0.0.1:11434/v1",
+        "assistant.server": "auto",  # auto: the bundled Ollama when present, else base_url
+        "assistant.base_url": os.environ.get("ERP_ASSISTANT_BASE_URL", "http://127.0.0.1:11434/v1"),
+        "assistant.auto_download": True,
         "assistant.model": "qwen3.5:2b",
         "assistant.api_key": "",
         "assistant.temperature": 0.2,

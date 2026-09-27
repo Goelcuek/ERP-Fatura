@@ -35,9 +35,9 @@ def extract():
     found.update(CAPABILITIES.values())
     found.update(XmlOptions.LABELS.values())
     found.update(["Test", "Production"])
-    from app.services.assistant.agent import NOT_UNDERSTOOD
+    from app.services.assistant.agent import NOT_UNDERSTOOD, STILL_DOWNLOADING
 
-    found.add(NOT_UNDERSTOOD)
+    found.update([NOT_UNDERSTOOD, STILL_DOWNLOADING])
     for cls in REGISTRY.values():
         found.update([cls.label, cls.description])
         for f in cls.fields:

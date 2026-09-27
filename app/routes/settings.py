@@ -135,11 +135,13 @@ def integrator():
 
 @bp.route("/assistant", methods=["GET", "POST"])
 def assistant():
-    from ..services.assistant import agent, speech
+    from ..services.assistant import agent, ollama, speech
 
     if request.method == "POST":
         Setting.set("assistant.enabled", f_bool("enabled"))
         Setting.set("assistant.use_llm", f_bool("use_llm"))
+        Setting.set("assistant.server", "custom" if f_str("server") == "custom" else "auto")
+        Setting.set("assistant.auto_download", f_bool("auto_download"))
         Setting.set("assistant.base_url", f_str("base_url") or Setting.DEFAULTS["assistant.base_url"])
         Setting.set("assistant.model", f_str("model") or Setting.DEFAULTS["assistant.model"])
         if request.form.get("api_key"):
@@ -156,14 +158,33 @@ def assistant():
         Setting.set("voice.speak_replies", f_bool("speak_replies"))
         Setting.set("voice.auto_send", f_bool("auto_send"))
         db.session.commit()
+        cfg = agent.settings()
+        if cfg["use_llm"] and cfg["auto_download"]:
+            ollama.manager().ensure_model_async(ollama.api_root(cfg["effective_base_url"]), cfg["model"])
         if request.form.get("test") == "1":
             ok, msg = agent.health()
             flash(_(msg) if ok else _("Connection failed: {err}", err=_(msg)), "success" if ok else "error")
         else:
             flash(_("Settings saved."), "success")
         return redirect(url_for("settings.assistant"))
+    cfg = agent.settings()
     return render_template("settings/assistant.html", s=Setting.group("assistant"), v=Setting.group("voice"),
-                           whisper=speech.available(), section="assistant")
+                           cfg=cfg, whisper=speech.available(), section="assistant")
+
+
+@bp.route("/assistant/model", methods=["GET", "POST"])
+def assistant_model():
+    """JSON model status for the settings page; POST starts the server and the download."""
+    from ..services.assistant import agent, ollama
+
+    cfg = agent.settings()
+    root = ollama.api_root(cfg["effective_base_url"])
+    if request.method == "POST":
+        ollama.manager().ensure_model_async(root, cfg["model"])
+    st = agent.model_status(cfg)
+    st["server_url"] = cfg["effective_base_url"]
+    st["using_bundled"] = cfg["bundled"] and cfg["server"] == "auto"
+    return st
 
 
 @bp.route("/users")

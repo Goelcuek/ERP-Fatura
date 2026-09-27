@@ -18,26 +18,39 @@
     </div>
   </div>
   <div class="form-section">
-    <div class="intro"><h3>{{ _('Local AI model') }}</h3><p>{{ _('Any server with an OpenAI-compatible API works: Ollama, llama.cpp, LM Studio.') }}</p></div>
+    <div class="intro"><h3>{{ _('Local AI model') }}</h3><p>{{ _('Runs on this computer. The model is downloaded once, automatically.') }}</p></div>
     <div>
+      <div class="model-status card" data-model-status data-url="{{ url_for('settings.assistant_model') }}" style="padding:14px 16px;margin-bottom:16px;box-shadow:none">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <div class="grow" style="flex:1;min-width:220px">
+            <div class="strong" data-ms-title>{{ _('Checking the model server…') }}</div>
+            <div class="small muted" data-ms-sub></div>
+          </div>
+          <button type="button" class="btn btn-sm hidden" data-ms-pull>{{ icon('download') }} {{ _('Download model now') }}</button>
+        </div>
+        <div class="progress hidden" data-ms-bar style="margin-top:10px"><span style="width:0"></span></div>
+      </div>
+      <div class="field"><label>{{ _('Model server') }}</label>
+        <div class="option-cards">
+          <label class="option-card"><input type="radio" name="server" value="auto" {{ 'checked' if s.server != 'custom' }}>
+            <span><b>{{ _('Built-in (recommended)') }}</b><p>{% if cfg.bundled %}{{ _('Uses the Ollama that ships with this app. Nothing to install.') }}{% else %}{{ _('No built-in Ollama in this installation; the address below is used.') }}{% endif %}</p></span></label>
+          <label class="option-card"><input type="radio" name="server" value="custom" {{ 'checked' if s.server == 'custom' }}>
+            <span><b>{{ _('Other server') }}</b><p>{{ _('An Ollama installed separately, LM Studio or llama.cpp at the address below.') }}</p></span></label>
+        </div>
+      </div>
       <div class="form-row">
         <div class="field"><label>{{ _('Model server address') }}</label><input type="text" name="base_url" value="{{ s.base_url }}" class="mono">
           <div class="hint">Ollama: http://127.0.0.1:11434/v1 · LM Studio: http://127.0.0.1:1234/v1 · llama.cpp: http://127.0.0.1:8080/v1</div></div>
         <div class="field"><label>{{ _('Model name') }}</label><input type="text" name="model" value="{{ s.model }}" class="mono">
-          <div class="hint">{{ _('Exactly as listed by the server, e.g. the output of “ollama list”.') }}</div></div>
+          <div class="hint">{{ _('Ollama model name, e.g. qwen3.5:2b. Changing it downloads the new model.') }}</div></div>
         <div class="field"><label>{{ _('Creativity (temperature)') }}</label><input type="number" step="0.1" min="0" max="1.5" name="temperature" value="{{ s.temperature }}">
           <div class="hint">{{ _('Keep low (0–0.3) for reliable actions.') }}</div></div>
         <div class="field"><label>{{ _('Time limit per answer (seconds)') }}</label><input type="number" min="10" name="timeout" value="{{ s.timeout }}"></div>
         <div class="field span-2"><label>{{ _('API key (optional)') }}</label><input type="password" name="api_key" autocomplete="off" placeholder="{{ '••••••••  ' ~ _('(saved — leave empty to keep)') if s.api_key else _('Not needed for Ollama') }}"></div>
       </div>
-      <details class="small" style="margin-top:4px"><summary style="cursor:pointer;color:var(--accent);font-weight:600">{{ _('Setting up Ollama (one time)') }}</summary>
-        <ol style="margin:10px 0 0;padding-left:18px;line-height:1.8">
-          <li>{{ _('Download and install Ollama from ollama.com (Windows, macOS, Linux).') }}</li>
-          <li>{{ _('Open a terminal and download the model:') }} <code>ollama pull {{ s.model }}</code></li>
-          <li>{{ _('Press “Save & test” below. Ollama starts automatically with Windows.') }}</li>
-        </ol>
-        <p class="muted" style="margin-top:8px">{{ _('A 2B model needs about 3 GB of free memory and runs on the processor; a graphics card makes it faster but is not required. Larger models (4B–8B) understand better but answer more slowly.') }}</p>
-      </details>
+      <label class="check"><input type="checkbox" name="auto_download" value="1" {{ 'checked' if s.auto_download }}>
+        <span>{{ _('Download the model automatically when it is missing') }}<small>{{ _('A 2B model is about 2–3 GB. The download runs in the background; workshop commands work meanwhile.') }}</small></span></label>
+      <p class="small muted" style="margin-top:4px">{{ _('A 2B model needs about 3 GB of free memory and runs on the processor; a graphics card makes it faster but is not required. Larger models (4B–8B) understand better but answer more slowly.') }}</p>
     </div>
   </div>
   <div class="form-section">
@@ -65,4 +78,45 @@
     <button class="btn btn-primary">{{ _('Save') }}</button>
   </div>
 </form>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const box = document.querySelector("[data-model-status]");
+  const T = {{ {
+    'ready': _('Model ready: {model}'), 'downloading': _('Downloading {model}… {percent}%'),
+    'missing': _('Model {model} is not downloaded yet.'), 'offline': _('The model server is not running.'),
+    'failed': _('Download failed: {msg}'), 'bundled': _('Built-in Ollama'), 'external': _('Server: {url}'),
+  }|tojson }};
+  const fmt = (s, v) => s.replace(/\{(\w+)\}/g, (_, k) => v[k] ?? "");
+  const mb = (n) => (n / 1048576).toFixed(0) + " MB";
+  let timer = null;
+  async function refresh(method) {
+    const csrf = document.querySelector('meta[name="csrf-token"]').content;
+    const r = await fetch(box.dataset.url, { method: method || "GET", headers: { "X-CSRF-Token": csrf } });
+    const st = await r.json();
+    const d = st.download, title = box.querySelector("[data-ms-title]"), sub = box.querySelector("[data-ms-sub]");
+    const bar = box.querySelector("[data-ms-bar]"), pull = box.querySelector("[data-ms-pull]");
+    sub.textContent = st.using_bundled ? T.bundled : fmt(T.external, { url: st.server_url });
+    bar.classList.add("hidden"); pull.classList.add("hidden");
+    if (d.state === "downloading") {
+      title.textContent = fmt(T.downloading, { model: d.model, percent: d.percent });
+      if (d.total) sub.textContent = mb(d.completed) + " / " + mb(d.total) + " · " + d.message;
+      bar.classList.remove("hidden"); bar.firstElementChild.style.width = d.percent + "%";
+    } else if (st.installed) {
+      title.innerHTML = '<span class="pos">✓</span> ' + fmt(T.ready, { model: st.model }).replace(/</g, "&lt;");
+    } else if (d.state === "error") {
+      title.textContent = fmt(T.failed, { msg: d.message }); pull.classList.remove("hidden");
+    } else if (!st.running) {
+      title.textContent = T.offline; pull.classList.toggle("hidden", !st.bundled);
+    } else {
+      title.textContent = fmt(T.missing, { model: st.model }); pull.classList.remove("hidden");
+    }
+    clearTimeout(timer);
+    if (d.state === "downloading" || method === "POST") timer = setTimeout(refresh, 1500);
+  }
+  box.querySelector("[data-ms-pull]").addEventListener("click", () => refresh("POST"));
+  refresh();
+})();
+</script>
 {% endblock %}

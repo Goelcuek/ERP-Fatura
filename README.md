@@ -29,6 +29,26 @@ Dark mode and mobile: [dashboard-dark.png](docs/screenshots/dashboard-dark.png),
 
 ---
 
+## Windows package for the shop (recommended)
+
+Build a single zip that contains everything — portable Python, all packages, the app and Ollama:
+
+```sh
+pip install requests
+python scripts/build_bundle.py --platform windows            # → dist/Atolye-windows-x64.zip
+python scripts/build_bundle.py --platform windows --cpu-only # smaller: without the GPU runtimes
+python scripts/build_bundle.py --platform windows --with-voice  # include offline speech recognition
+```
+
+It can be built on Windows, Linux or macOS. The latest Ollama release is downloaded from GitHub and checked
+against its published SHA-256 checksum (`--ollama-version v0.X.Y` pins one). On the shop PC: unzip (e.g. to
+`C:\Atolye`), double-click **Atolye.bat**, open <http://127.0.0.1:8080>. The first start downloads the AI model in the
+background. **Atolye-HTTPS.bat** starts with https so phones and tablets can use the microphone. All data stays in
+the `data` folder next to it. Third-party licences are listed in `THIRD_PARTY_NOTICES.txt`.
+
+To add the bundled Ollama to a normal checkout instead (Linux/macOS development, or `start.sh`/`start-windows.bat`):
+`python scripts/build_bundle.py --platform linux --only-ollama` puts it in `vendor/ollama`, where the app finds it.
+
 ## Quick start
 
 Requires **Python 3.10+**. No database server — data is a single SQLite file.
@@ -47,7 +67,7 @@ tablets and phones on the same network use the address printed in the console, e
 **Docker:**
 
 ```sh
-docker compose up -d           # data is kept in ./data
+docker compose up -d           # data is kept in ./data; an Ollama container serves the assistant
 ```
 
 **Try it with demo data** (a fictional workshop, ~230 invoices, 12 open repair jobs):
@@ -207,17 +227,22 @@ speak; technicians can just say *"bu işi bitirdim"* and the job is updated.
    payments, expenses, stock corrections and new customers always show a Confirm button** first. Cancelling a job
    also asks for confirmation.
 
-**Setting up the local model (one time, no cost):**
+**The local model — nothing to install, only the model is downloaded**
 
-1. Install [Ollama](https://ollama.com) on the shop PC.
-2. `ollama pull qwen3.5:2b` (use the exact tag Ollama lists; `ollama list` shows installed models).
-3. Settings → Assistant → *Save & test*. Defaults: server `http://127.0.0.1:11434/v1`, model `qwen3.5:2b`.
+The Windows package (below) ships with [Ollama](https://github.com/ollama/ollama) (MIT license). When the app
+starts it launches the bundled Ollama in the background on its own port (11435, so it never clashes with an Ollama
+installed separately), keeps models in `data/models/ollama`, and **downloads the configured model automatically on
+first start** (`qwen3.5:2b`, about 2–3 GB, once). Settings → Assistant shows the download progress and has a
+*Download model now* button; until the model is ready the workshop commands already work, and the assistant says
+the model is still downloading. The app stops Ollama when it exits and restarts it if it stopped.
 
-Any OpenAI-compatible local server works instead of Ollama (llama.cpp `llama-server`, LM Studio). A 2B model needs
-about 3 GB of free RAM and runs on the CPU. **Expectations:** a 2B model is fast and free, but it will sometimes
-misunderstand longer or unusual Turkish requests or pick the wrong tool — that is why everyday commands don't depend
-on it and why risky actions need confirmation. If the PC has 8 GB+ RAM to spare, a 4B model understands noticeably
-better; change the model name in Settings.
+Other set-ups work too: choose *Other server* in Settings → Assistant for an Ollama installed separately, LM Studio
+or llama.cpp (any OpenAI-compatible API). With an Ollama server the missing model is still downloaded automatically.
+
+A 2B model needs about 3 GB of free RAM and runs on the CPU (a graphics card is used when present). **Expectations:**
+a 2B model is fast and free, but it will sometimes misunderstand longer or unusual Turkish requests or pick the wrong
+tool — that is why everyday commands don't depend on it and why risky actions need confirmation. If the PC has 8 GB+
+RAM to spare, a 4B model understands noticeably better: change the model name in Settings and it is downloaded.
 
 **Voice**
 
@@ -270,7 +295,9 @@ app/
   services/ubl_profile.py   # per-integrator XML adaptation, XSLT embedding and rendering
   services/backup.py        # backup / restore / scheduler
   services/workshop.py      # business operations shared by pages and the assistant
-  services/assistant/       # command parser, local model client, tools, conversation logic, speech
+  services/assistant/       # command parser, local model client, tools, conversation logic, speech,
+                            # bundled Ollama manager (start/stop, model download)
+scripts/build_bundle.py     # Windows package builder (portable Python + app + Ollama)
   routes/                   # Flask blueprints
   templates/, static/       # server-rendered UI, no build step, no CDN (works offline)
   translations_tr.py        # Turkish UI strings

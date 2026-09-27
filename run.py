@@ -13,6 +13,37 @@ from app import create_app
 from app.services.backup import start_scheduler
 
 
+def start_assistant_model(app):
+    """Start the bundled Ollama (if shipped) and download the model on first run, in the background."""
+    with app.app_context():
+        from app.services.assistant import agent, ollama
+
+        cfg = agent.settings()
+        if not (cfg["enabled"] and cfg["use_llm"]):
+            return
+        mgr = ollama.manager(app)
+        if cfg["auto_download"]:
+            mgr.ensure_model_async(ollama.api_root(cfg["effective_base_url"]), cfg["model"])
+        elif mgr.bundled and cfg["server"] == "auto":
+            import threading
+
+            threading.Thread(target=mgr.start, daemon=True).start()
+
+
+def exit_on_signals():
+    """Turn terminate / console-close signals into a normal exit so cleanup (e.g. stopping Ollama) runs."""
+    import signal
+    import sys
+
+    def handler(signum, frame):
+        sys.exit(0)
+
+    for name in ("SIGTERM", "SIGHUP", "SIGBREAK"):  # SIGBREAK: console window closed on Windows
+        sig = getattr(signal, name, None)
+        if sig is not None:
+            signal.signal(sig, handler)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Atölye ERP server")
     parser.add_argument("--host", default="0.0.0.0")
@@ -24,7 +55,9 @@ def main():
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     app = create_app()
+    exit_on_signals()
     start_scheduler(app)
+    start_assistant_model(app)
 
     from app.tls import local_addresses
 
