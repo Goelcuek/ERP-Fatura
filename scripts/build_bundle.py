@@ -229,6 +229,53 @@ python\\python.exe run.py {args}%*
 pause
 """
 
+# run as administrator (asks via UAC), then python -m app.winsetup <action>
+ADMIN_BAT = """@echo off
+REM {title}
+cd /d "%~dp0"
+net session >nul 2>&1
+if %errorlevel% neq 0 (
+  echo Yonetici izni isteniyor...
+  powershell -NoProfile -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
+  exit /b
+)
+chcp 65001 >nul
+python\\python.exe -m app.winsetup {action}
+echo.
+pause
+"""
+
+STOP_BAT = """@echo off
+REM Arka planda calisan Atolye ERP'yi durdurur (or. guncellemeden once).
+cd /d "%~dp0"
+chcp 65001 >nul
+python\\python.exe -m app.winsetup stop
+timeout /t 5
+"""
+
+README_TR = (
+    "Atolye ERP\r\n\r\n"
+    "KURULUM (onerilen)\r\n"
+    "1. Bu klasoru kalici bir yere cikarin (or. C:\\Atolye).\r\n"
+    "2. Kur.bat dosyasina cift tiklayin ve yonetici iznini onaylayin. Kur.bat:\r\n"
+    "   - uygulamayi Windows her acildiginda pencere olmadan baslatir,\r\n"
+    "   - masaustune 'Atolye' kisayolu koyar,\r\n"
+    "   - telefon/tabletlerin baglanabilmesi icin guvenlik duvarinda izin verir (yalnizca yerel ag),\r\n"
+    "   - atolyeye ozel sertifikayi bu bilgisayara tanitir (https, uyari yok),\r\n"
+    "   - uygulamayi baslatir ve telefon kurulum sayfasini (QR kodlari) acar.\r\n"
+    "3. Ilk acilista yapay zeka modeli arka planda indirilir (2-3 GB, bir kez).\r\n"
+    "   Ilerlemeyi Ayarlar > Asistan sayfasinda gorebilirsiniz.\r\n\r\n"
+    "TELEFON / TABLET\r\n"
+    "Uygulamada sol alttaki telefon simgesine (veya Ayarlar > Telefon ve tabletler) tiklayin ve QR kodlarini\r\n"
+    "telefonun kamerasiyla okutun. Telefon ayni Wi-Fi agina bagli olmalidir.\r\n\r\n"
+    "DIGER\r\n"
+    "Durdur.bat  - arka planda calisan uygulamayi durdurur (guncellemeden once).\r\n"
+    "Kaldir.bat  - Kur.bat'in yaptiklarini geri alir. Verileriniz silinmez.\r\n"
+    "Atolye.bat / Atolye-HTTPS.bat - kurulum yapmadan, pencere acik kaldigi surece calistirir.\r\n"
+    "Tum veriler 'data' klasorundedir; yedekler Ayarlar > Yedekler sayfasindan alinir.\r\n"
+    "Kayitlar: data\\logs\\server.log\r\n"
+)
+
 NOTICES = """Third-party software included in this package
 ==============================================
 
@@ -271,14 +318,14 @@ def build_windows(out, args):
     (stage / "Atolye-HTTPS.bat").write_text(
         BAT.format(title="Atolye ERP (https, telefon/tablet mikrofonu icin)", args="--https ").replace("\n", "\r\n"))
     (stage / "THIRD_PARTY_NOTICES.txt").write_text(NOTICES.format(ollama_version=ollama_version))
-    (stage / "BENIOKU.txt").write_text(
-        "Atolye ERP\r\n\r\n"
-        "1. Bu klasoru istediginiz yere cikarin (or. C:\\Atolye).\r\n"
-        "2. Atolye.bat dosyasina cift tiklayin ve tarayicida http://127.0.0.1:8080 adresini acin.\r\n"
-        "3. Ilk acilista yapay zeka modeli arka planda indirilir (2-3 GB, bir kez).\r\n"
-        "   Ilerlemeyi Ayarlar > Asistan sayfasinda gorebilirsiniz.\r\n"
-        "4. Telefon/tabletten mikrofon kullanmak icin Atolye-HTTPS.bat ile baslatin.\r\n"
-        "Tum veriler 'data' klasorundedir; yedekler Ayarlar > Yedekler sayfasindan alinir.\r\n")
+    (stage / "Kur.bat").write_text(
+        ADMIN_BAT.format(title="Atolye ERP kurulumu: otomatik baslatma, kisayol, guvenlik duvari, sertifika",
+                         action="install").replace("\n", "\r\n"))
+    (stage / "Kaldir.bat").write_text(
+        ADMIN_BAT.format(title="Kur.bat'in yaptiklarini geri alir (veriler silinmez)",
+                         action="uninstall").replace("\n", "\r\n"))
+    (stage / "Durdur.bat").write_text(STOP_BAT.replace("\n", "\r\n"))
+    (stage / "BENIOKU.txt").write_text(README_TR)
     archive = Path(out) / f"{name}-windows-x64.zip"
     log(f"creating {archive.name}")
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zf:

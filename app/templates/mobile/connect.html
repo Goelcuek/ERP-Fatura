@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Phones & tablets') }}{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>{{ _('Phones & tablets') }}</h1>
+  <div class="sub">{{ _('Use the app and the voice assistant on phones in the workshop. The phone is only a screen: the assistant and all data stay on this computer.') }}</div></div></div>
+
+{% if not ip %}
+  <div class="alert alert-warning">{{ icon('warning') }}<div class="body"><b>{{ _('This computer has no network address.') }}</b>
+    {{ _('Connect it to the workshop Wi-Fi or network cable and reload this page.') }}</div></div>
+{% else %}
+  {% if ips|length > 1 %}
+  <div class="connect-ips small muted">{{ _('This computer has several addresses. If the phone can’t connect, try another one:') }}
+    {% for a in ips %}<a class="tag {{ 'blue' if a == ip }}" href="{{ url_for('mobile.connect', ip=a) }}">{{ a }}</a>{% endfor %}</div>
+  {% endif %}
+
+  {% if not info.https %}
+  <div class="alert alert-warning" style="margin-bottom:16px">{{ icon('warning') }}<div class="body">
+    <b>{{ _('The app is running without https.') }}</b>
+    {{ _('Phones can open it, but the microphone and the home-screen app need the secure mode. Start the app with “Atolye-HTTPS” (or run Kur.bat once) and open this page again.') }}</div></div>
+  {% endif %}
+
+  <div class="connect-grid">
+    {% if info.https %}
+    <section class="card connect-card">
+      <div class="card-head"><h2><span class="step-no">1</span> {{ _('Set up the phone') }}</h2><span class="tag">{{ _('once per phone') }}</span></div>
+      <div class="card-body">
+        <div class="qr-box">{{ start_qr|safe }}</div>
+        <div class="mono small center">{{ start_url }}</div>
+        <p class="small muted">{{ _('Scan with the phone’s camera. The page that opens installs the workshop certificate and shows each step for iPhone and Android.') }}</p>
+      </div>
+    </section>
+    {% endif %}
+    <section class="card connect-card">
+      <div class="card-head"><h2>{% if info.https %}<span class="step-no">2</span> {% endif %}{{ _('Open the app') }}</h2></div>
+      <div class="card-body">
+        <div class="qr-box">{{ app_qr|safe }}</div>
+        <div class="mono small center">{{ app_url }}</div>
+        <p class="small muted">{{ _('Then add it to the home screen: on iPhone Share → “Add to Home Screen”, on Android ⋮ → “Install app”. It opens full screen like a normal app.') }}</p>
+      </div>
+    </section>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-head"><h2>{{ _('Good to know') }}</h2></div>
+    <div class="card-body">
+      <ul class="plain-list">
+        <li>{{ icon('globe', 'sm') }} {{ _('Phones must be on the same Wi-Fi as this computer, and this computer must be switched on.') }}</li>
+        <li>{{ icon('mic', 'sm') }} {{ _('Voice commands on the phone: tap the microphone and say e.g. “I finished the Bosch drill”.') }}</li>
+        <li>{{ icon('pin', 'sm') }} {{ _('If the router gives this computer a new address, scan the code again. To avoid that, reserve a fixed address for this computer in the router (DHCP reservation).') }}</li>
+        {% if info.https %}<li>{{ icon('shield', 'sm') }} <span>{{ _('The certificate is created on this computer and only covers local network addresses, so it can’t be misused for other websites.') }}
+          <a href="{{ url_for('mobile.ca', save=1) }}">{{ _('Download the certificate') }}</a></span></li>{% endif %}
+      </ul>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

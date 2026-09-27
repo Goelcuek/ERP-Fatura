@@ -2,6 +2,7 @@
 {% block title %}{{ _('Assistant') }}{% endblock %}
 {% block content %}
 <div class="page-head"><div><h1>{{ _('Assistant') }}</h1>
-  <div class="sub">{{ _('Talk or type. Workshop updates happen right away and can be undone; invoices and payments ask for confirmation.') }}</div></div></div>
+  <div class="sub">{{ _('Talk or type. Workshop updates happen right away and can be undone; invoices and payments ask for confirmation.') }}</div></div>
+  <div class="actions hide-sm"><a class="btn" href="{{ url_for('mobile.connect') }}">{{ icon('smartphone') }} {{ _('Use on a phone') }}</a></div></div>
 {% with page_mode=True %}{% include "partials/assistant.html" %}{% endwith %}
 {% endblock %}

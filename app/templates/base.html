@@ -10,6 +10,7 @@
     try { var t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
   </script>
   <meta name="csrf-token" content="{{ csrf_token() }}">
+{% include "partials/pwa_head.html" %}
 </head>
 <body data-endpoint="{{ request.endpoint or '' }}" data-view-args='{{ (request.view_args or {})|tojson }}'>
 {% include "partials/icons.html" %}
@@ -48,6 +49,7 @@
           <span class="who ellipsis"><b class="ellipsis">{{ g.user.full_name or g.user.username }}</b><span>{{ _('Administrator') if g.user.is_admin else _('Staff') }}</span></span>
         </a>
         <span class="foot-actions">
+          <a class="icon-btn" href="{{ url_for('mobile.connect') }}" title="{{ _('Phones & tablets') }}">{{ icon('smartphone', 'sm') }}</a>
           <button class="icon-btn" type="button" data-theme-toggle title="{{ _('Toggle dark mode') }}">{{ icon('moon', 'sm') }}</button>
           <form method="post" action="{{ url_for('auth.logout') }}" class="inline">
             <input type="hidden" name="_csrf" value="{{ csrf_token() }}">

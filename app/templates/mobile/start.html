@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="{{ current_lang() }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ _('Set up this phone') }} · {{ brand_name }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body class="phone-page">
+{% include "partials/icons.html" %}
+{% macro ios_steps() %}
+  <ol class="setup-steps">
+    <li><b>{{ _('Use Safari.') }}</b> {{ _('If this page opened in another browser, copy the address into Safari.') }}</li>
+    <li><a class="btn btn-primary btn-block" href="{{ url_for('mobile.ca') }}">{{ icon('download') }} {{ _('Download the certificate') }}</a>
+      <span class="small muted">{{ _('Tap “Allow” when Safari asks about a configuration profile.') }}</span></li>
+    <li>{{ _('Open Settings → “Profile Downloaded” → Install, and enter your passcode.') }}</li>
+    <li>{{ _('Settings → General → About → Certificate Trust Settings: turn on “{name}”.', name=ca_name) }}</li>
+    <li><a class="btn btn-block" href="{{ app_url }}">{{ icon('external') }} {{ _('Open the app') }}</a>
+      <span class="small muted">{{ _('Then tap Share → “Add to Home Screen”.') }}</span></li>
+  </ol>
+{% endmacro %}
+{% macro android_steps() %}
+  <ol class="setup-steps">
+    <li><a class="btn btn-primary btn-block" href="{{ url_for('mobile.ca', save=1) }}">{{ icon('download') }} {{ _('Download the certificate') }}</a>
+      <span class="small muted">{{ _('It is saved to Downloads as Atolye-sertifika.crt.') }}</span></li>
+    <li>{{ _('Open Settings and search for “certificate”. Choose “Install a certificate” (or “Install from device storage”) → “CA certificate” → “Install anyway”, then pick Atolye-sertifika.crt.') }}</li>
+    <li><a class="btn btn-block" href="{{ app_url }}">{{ icon('external') }} {{ _('Open the app') }}</a>
+      <span class="small muted">{{ _('Then in Chrome tap ⋮ → “Install app” (or “Add to Home screen”).') }}</span></li>
+  </ol>
+{% endmacro %}
+<main class="phone-wrap">
+  <div class="phone-brand">
+    {% if has_logo %}<span class="brand-logo"><img src="{{ url_for('auth.logo') }}" alt=""></span>{% else %}<span class="brand-mark mono-mark">{{ brand_initials }}</span>{% endif %}
+    <b>{{ brand_name }}</b>
+  </div>
+  <h1>{{ _('Set up this phone') }}</h1>
+
+  {% if not info.https %}
+    <p class="muted">{{ _('Open the app and add it to your home screen. Voice commands need the secure (https) mode on the workshop computer.') }}</p>
+    <a class="btn btn-primary btn-lg btn-block" href="{{ app_url }}">{{ icon('external') }} {{ _('Open the app') }}</a>
+  {% else %}
+    <p class="muted">{{ _('Once per phone: install the workshop’s certificate so the phone trusts the app. It only works for this workshop’s computer, not for other websites.') }}</p>
+    {% if platform == 'android' %}
+      <section class="card setup-card"><h2>{{ icon('smartphone', 'sm') }} Android</h2>{{ android_steps() }}</section>
+      <details class="card setup-card"><summary>iPhone / iPad</summary>{{ ios_steps() }}</details>
+    {% else %}
+      <section class="card setup-card"><h2>{{ icon('smartphone', 'sm') }} iPhone / iPad</h2>{{ ios_steps() }}</section>
+      <details class="card setup-card" {{ 'open' if not platform }}><summary>Android</summary>{{ android_steps() }}</details>
+    {% endif %}
+    <details class="card setup-card">
+      <summary>{{ _('Can’t install the certificate?') }}</summary>
+      <p class="small muted">{{ _('Open the app anyway and choose “Advanced” → “Proceed”. Everything works, including the microphone, but the phone shows a warning each time and can’t install it as an app.') }}</p>
+      <a class="btn btn-block" href="{{ app_url }}">{{ _('Open the app') }}</a>
+    </details>
+  {% endif %}
+  <p class="small muted center">{{ _('The phone must be on the workshop Wi-Fi. Everything runs on the workshop computer.') }}</p>
+</main>
+</body>
+</html>

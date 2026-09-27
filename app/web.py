@@ -12,7 +12,10 @@ from .extensions import db
 from .i18n import _
 from .models import UNITS, Setting, User
 
-PUBLIC_ENDPOINTS = {"auth.login", "auth.setup", "auth.logo", "static"}
+PUBLIC_ENDPOINTS = {"auth.login", "auth.setup", "auth.logo", "static",
+                    # phone set-up and home-screen app files (fetched before or without a login)
+                    "mobile.start", "mobile.ca", "mobile.manifest", "mobile.icon", "mobile.apple_icon",
+                    "mobile.service_worker", "mobile.offline"}
 
 
 def admin_required(fn):

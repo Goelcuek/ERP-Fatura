@@ -46,6 +46,12 @@ def test_windows_bundle_offline(tmp_path):
     assert b"python\\python.exe run.py" in bat and b"\r\n" in bat
     assert b"--https" in (stage / "Atolye-HTTPS.bat").read_bytes()
     assert "MIT License" in (stage / "THIRD_PARTY_NOTICES.txt").read_text()
+    kur = (stage / "Kur.bat").read_bytes()
+    assert b"-Verb RunAs" in kur and b"python\\python.exe -m app.winsetup install" in kur and b"\r\n" in kur
+    assert b"app.winsetup uninstall" in (stage / "Kaldir.bat").read_bytes()
+    assert b"app.winsetup stop" in (stage / "Durdur.bat").read_bytes()
+    assert (stage / "app/winsetup.py").exists()
+    assert "Kur.bat" in (stage / "BENIOKU.txt").read_text()
     with zipfile.ZipFile(out / "Atolye-windows-x64.zip") as zf:
         names = zf.namelist()
     assert "Atolye/Atolye.bat" in names and "Atolye/vendor/ollama/ollama.exe" in names

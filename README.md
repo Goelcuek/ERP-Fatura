@@ -41,10 +41,21 @@ python scripts/build_bundle.py --platform windows --with-voice  # include offlin
 ```
 
 It can be built on Windows, Linux or macOS. The latest Ollama release is downloaded from GitHub and checked
-against its published SHA-256 checksum (`--ollama-version v0.X.Y` pins one). On the shop PC: unzip (e.g. to
-`C:\Atolye`), double-click **Atolye.bat**, open <http://127.0.0.1:8080>. The first start downloads the AI model in the
-background. **Atolye-HTTPS.bat** starts with https so phones and tablets can use the microphone. All data stays in
-the `data` folder next to it. Third-party licences are listed in `THIRD_PARTY_NOTICES.txt`.
+against its published SHA-256 checksum (`--ollama-version v0.X.Y` pins one).
+
+On the shop PC: unzip to a permanent folder (e.g. `C:\Atolye`) and double-click **Kur.bat** (asks for administrator
+rights once). It
+
+- starts the app at every Windows log-in, hidden (no console window; log in `data\logs\server.log`),
+- puts an **Atölye** shortcut on the desktop (`https://127.0.0.1:8443`),
+- allows ports 8080/8443 in Windows Firewall — for the local network only,
+- makes Windows trust the shop certificate (see [Phones and tablets](#phones-and-tablets)),
+- starts the app and opens the phone set-up page.
+
+**Durdur.bat** stops the background app (e.g. before copying a new version over it), **Kaldir.bat** undoes everything
+Kur.bat did; the `data` folder is never touched. Without installing, **Atolye.bat** / **Atolye-HTTPS.bat** run the
+app while their console window stays open. The first start downloads the AI model in the background. All data stays
+in the `data` folder. Third-party licences are listed in `THIRD_PARTY_NOTICES.txt`.
 
 To add the bundled Ollama to a normal checkout instead (Linux/macOS development, or `start.sh`/`start-windows.bat`):
 `python scripts/build_bundle.py --platform linux --only-ollama` puts it in `vendor/ollama`, where the app finds it.
@@ -62,7 +73,8 @@ Requires **Python 3.10+**. No database server — data is a single SQLite file.
 ```
 
 Open <http://localhost:8080>. On first launch a setup page creates the administrator account. Other computers,
-tablets and phones on the same network use the address printed in the console, e.g. `http://192.168.1.20:8080`.
+tablets and phones on the same network use the address printed in the console, e.g. `http://192.168.1.20:8080`
+(for phones see [Phones and tablets](#phones-and-tablets)).
 
 **Docker:**
 
@@ -251,11 +263,40 @@ RAM to spare, a 4B model understands noticeably better: change the model name in
 - *On this computer (Whisper, offline)*: `pip install -r requirements-voice.txt`; the Whisper model (~470 MB for
   "small") downloads once into `data/models`, then speech never leaves the shop. Chosen automatically when installed.
 - Replies can be read aloud (speaker button in the panel).
-- **Phones and tablets only allow the microphone on https.** Start with `python run.py --https` (port 8443): a
-  certificate for this PC's name and LAN address is created in `data/tls/`; accept the browser warning once per
-  device. On the shop PC itself `http://127.0.0.1` works without it.
+- **Phones and tablets only allow the microphone on https** — see below. On the shop PC itself `http://127.0.0.1`
+  works without it.
 
 The assistant can be switched off, or limited to the built-in commands, in Settings → Assistant.
+
+## Phones and tablets
+
+The phone is only a screen: the app, the database, the AI model and (with Whisper) speech recognition all run on the
+shop PC; phones on the same Wi-Fi connect to it. Nothing is installed from an app store.
+
+**Set-up page with QR codes:** the phone icon at the bottom of the sidebar (or Settings → Phones & tablets, `/connect`)
+shows two QR codes — *1. set up the phone* (once per phone) and *2. open the app*. The set-up page opened on the phone
+walks through the steps for iPhone and Android.
+Screenshots: [the page on the PC](docs/screenshots/phones-connect.png), [set-up on the phone](docs/screenshots/phone-setup.png).
+
+**Certificate (https without warnings):** browsers allow the microphone, installing the app and offline support only
+on trusted https pages, and public certificates can't be issued for a PC on a private network. So the app creates
+its own small certificate authority in `data/tls/` (`ca.crt`, kept for 10 years) and signs the server certificate
+with it; the server certificate is renewed automatically when the PC's address changes, without the phones having to
+do anything. Each phone installs `ca.crt` once. The CA is **name-constrained** to private network addresses,
+`localhost`, `*.local` and the PC's name, so even if its key were stolen it could not be used to impersonate any
+internet site. Kur.bat adds it to Windows' trusted roots for the browsers on the shop PC. Can't install it on a
+phone? Accept the browser warning instead: everything including the microphone works, only installing it as an
+app does not.
+
+**Home-screen app:** a web app manifest, generated icons (company logo, or the monogram such as "ÇT") and a service
+worker make it installable: Safari → Share → *Add to Home Screen*, Chrome → ⋮ → *Install app*. It opens full screen,
+with shortcuts to the assistant and "New service order". The service worker never caches business data; it only
+shows a friendly page when the PC can't be reached.
+
+**Ports:** `python run.py --https` serves the app on 8443 and a small helper on 8080 that serves the set-up page and
+certificate over plain http (a phone can't open an https page it doesn't trust yet) and redirects everything else
+to https. Reserve a fixed address for the PC in the router (DHCP reservation) so the phones' shortcuts keep working.
+In Docker, set `ERP_LAN_IP` to the host's LAN address (see `docker-compose.yml`).
 
 ## Accounting scope
 
@@ -297,6 +338,9 @@ app/
   services/workshop.py      # business operations shared by pages and the assistant
   services/assistant/       # command parser, local model client, tools, conversation logic, speech,
                             # bundled Ollama manager (start/stop, model download)
+  services/mobile.py        # phones: addresses, QR codes, app icons, http helper for https mode
+  tls.py                    # shop certificate authority + server certificate
+  winsetup.py               # Windows set-up used by Kur.bat / Kaldir.bat / Durdur.bat
 scripts/build_bundle.py     # Windows package builder (portable Python + app + Ollama)
   routes/                   # Flask blueprints
   templates/, static/       # server-rendered UI, no build step, no CDN (works offline)

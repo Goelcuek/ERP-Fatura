@@ -684,3 +684,36 @@ pre.xml { background: var(--surface-2); border: 1px solid var(--border); border-
   .asst-mic, .asst-send { width: 52px; height: 52px; }
 }
 @media print { .asst { display: none !important; } }
+
+/* ---------------------------------------------------------------- phones & tablets */
+.center { text-align: center; }
+.connect-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.connect-card .card-body { display: flex; flex-direction: column; gap: 10px; }
+.connect-ips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 14px; }
+.qr-box { background: #fff; border-radius: var(--radius); padding: 12px; width: min(100%, 260px); margin: 0 auto; border: 1px solid var(--border); }
+.qr-box .qr { display: block; width: 100%; height: auto; }
+.qr-box .qr path { fill: #000; }
+.step-no { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--on-accent);
+  font-size: 12px; font-weight: 700; margin-right: 6px; vertical-align: 1px; }
+.plain-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; color: var(--text-2); }
+.plain-list li { display: flex; gap: 10px; align-items: flex-start; }
+.plain-list .icon { margin-top: 3px; flex: none; color: var(--muted); }
+
+.phone-page { background: var(--bg); }
+.phone-wrap { max-width: 460px; margin: 0 auto; padding: 24px 16px 40px; display: grid; gap: 14px; }
+.phone-wrap h1 { font-size: 22px; margin: 0; }
+.phone-wrap p { margin: 0; }
+.phone-brand { display: flex; align-items: center; gap: 10px; font-size: 15px; }
+.phone-brand .brand-mark, .phone-brand .brand-logo { width: 36px; height: 36px; }
+.setup-card { padding: 16px; }
+.setup-card h2 { font-size: 16px; margin: 0 0 6px; display: flex; gap: 8px; align-items: center; }
+.setup-card summary { cursor: pointer; font-weight: 600; }
+.setup-card[open] summary { margin-bottom: 8px; }
+.setup-steps { margin: 0; padding-left: 22px; display: grid; gap: 14px; }
+.setup-steps li { padding-left: 4px; }
+.setup-steps li::marker { font-weight: 700; color: var(--accent); }
+.setup-steps .btn { margin: 2px 0 6px; }
+.setup-steps .small { display: block; }
+.connect-grid > .card { margin-top: 0; }
+/* keep the last lines of a page clear of the floating assistant button */
+body:has(.asst-float) .content { padding-bottom: 96px; }
