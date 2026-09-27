@@ -1,0 +1,21 @@
+{% extends "settings/_layout.html" %}
+{% block title %}{{ _('Users') }}{% endblock %}
+{% block heading %}{{ _('Settings') }}{% endblock %}
+{% block subheading %}{{ _('People who can sign in.') }}{% endblock %}
+{% block settings %}
+<div class="card">
+  <div class="card-head"><h2>{{ _('Users') }}</h2><a class="btn btn-sm btn-primary" href="{{ url_for('settings.user_form') }}">{{ icon('plus') }} {{ _('New user') }}</a></div>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>{{ _('Name') }}</th><th>{{ _('Role') }}</th><th>{{ _('Technician') }}</th><th>{{ _('Status') }}</th><th></th></tr></thead>
+    <tbody>{% for u in users %}
+      <tr class="clickable" data-href="{{ url_for('settings.user_form', uid=u.id) }}">
+        <td><div style="display:flex;gap:10px;align-items:center"><span class="avatar" style="background:var(--accent-soft);color:var(--accent)">{{ u.initials }}</span><div><div class="primary">{{ u.full_name or u.username }}</div><div class="secondary">{{ u.username }}</div></div></div></td>
+        <td>{{ _('Administrator') if u.is_admin else _('Staff') }}</td>
+        <td>{{ _('Yes') if u.is_technician else '—' }}</td>
+        <td>{% if u.active %}<span class="badge badge-success"><span class="dot"></span>{{ _('Active') }}</span>{% else %}<span class="badge badge-muted"><span class="dot"></span>{{ _('Disabled') }}</span>{% endif %}</td>
+        <td class="actions">{{ icon('chevron-right', 'sm') }}</td>
+      </tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endblock %}

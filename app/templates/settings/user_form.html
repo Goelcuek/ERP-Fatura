@@ -1,0 +1,23 @@
+{% extends "settings/_layout.html" %}
+{% block title %}{{ _('User') }}{% endblock %}
+{% block heading %}{{ u.full_name or _('New user') }}{% endblock %}
+{% block settings %}
+<form method="post" class="card">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <div class="card-body">
+    <div class="form-row">
+      <div class="field"><label class="req">{{ _('Full name') }}</label><input type="text" name="full_name" value="{{ u.full_name or '' }}" required></div>
+      <div class="field"><label class="req">{{ _('Username') }}</label><input type="text" name="username" value="{{ u.username or '' }}" required autocomplete="off"></div>
+      <div class="field"><label class="{{ 'req' if not u.id }}">{{ _('Password') }}</label><input type="password" name="password" minlength="8" autocomplete="new-password" placeholder="{{ _('Leave empty to keep') if u.id else '' }}"></div>
+      <div class="field"><label>{{ _('Language') }}</label><select name="lang">{% for code, name in LANGUAGES.items() %}<option value="{{ code }}" {{ 'selected' if u.lang == code }}>{{ name }}</option>{% endfor %}</select></div>
+    </div>
+    <div class="field"><label>{{ _('Role') }}</label><div class="segmented">
+      <label><input type="radio" name="role" value="staff" {{ 'checked' if not u.is_admin }}><span>{{ _('Staff') }}</span></label>
+      <label><input type="radio" name="role" value="admin" {{ 'checked' if u.is_admin }}><span>{{ _('Administrator') }}</span></label></div>
+      <div class="hint">{{ _('Only administrators can change settings, users and backups.') }}</div></div>
+    <label class="check"><input type="checkbox" name="is_technician" value="1" {{ 'checked' if u.is_technician }}><span>{{ _('Technician') }}<small>{{ _('Can be assigned to service orders.') }}</small></span></label>
+    <label class="check"><input type="checkbox" name="active" value="1" {{ 'checked' if u.active }}><span>{{ _('Active') }}<small>{{ _('Disabled users cannot sign in.') }}</small></span></label>
+  </div>
+  <div class="form-actions"><a class="btn btn-ghost" href="{{ url_for('settings.users') }}">{{ _('Cancel') }}</a><button class="btn btn-primary">{{ _('Save') }}</button></div>
+</form>
+{% endblock %}

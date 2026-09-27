@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import contact_picker, line_editor, totals_box %}
+{% block title %}{{ _('Edit invoice') if inv.id else _('New invoice') }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('invoices.index') }}">{{ _('Invoices') }}</a>{{ icon('chevron-right', 'sm') }}<span>{{ _('Draft') if inv.id else _('New') }}</span></div>
+<div class="page-head">
+  <div><h1>{{ _('Edit draft invoice') if inv.id else _('New invoice') }}</h1>
+    <div class="sub">{{ _('The invoice number is assigned when you issue it.') }}</div></div>
+</div>
+
+<form method="post" data-invoice-form data-default-profile="{{ inv.profile if inv.profile != 'EARSIVFATURA' else 'TICARIFATURA' }}">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <div class="split">
+    <div class="stack">
+      <div class="card">
+        <div class="card-head"><h2>{{ _('Customer') }}</h2></div>
+        <div class="card-body">
+          {{ contact_picker(inv.contact) }}
+          <div class="alert alert-info {{ 'hidden' if not inv.contact or inv.contact.efatura_user }}" data-efatura-note style="margin-top:12px">
+            {{ icon('info') }}<div class="body">{{ _('This customer is not an e-Fatura user, so the invoice will be an e-Arşiv invoice.') }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>{{ _('Lines') }}</h2></div>
+        {{ line_editor(inv.lines, products, vat_rates, inv.withholding_rate if inv.type_code == 'TEVKIFAT' else 0) }}
+        <div class="lines-foot">
+          <div style="flex:1;min-width:260px;max-width:460px">
+            <label>{{ _('Notes on invoice') }}</label>
+            <textarea name="notes" rows="3" placeholder="{{ _('e.g. device and serial number, delivery info') }}">{{ inv.notes or '' }}</textarea>
+          </div>
+          {{ totals_box(inv.recompute()) }}
+        </div>
+      </div>
+    </div>
+
+    <div class="stack">
+      <div class="card">
+        <div class="card-head"><h2>{{ _('Invoice details') }}</h2></div>
+        <div class="card-body">
+          <div class="field">
+            <label>{{ _('Profile') }}</label>
+            <div class="option-cards">
+              {% for p, desc in [('TICARIFATURA', _('Receiver can accept or reject within 8 days.')), ('TEMELFATURA', _('No accept/reject step.')), ('EARSIVFATURA', _('For customers that are not e-Fatura users, incl. individuals.'))] %}
+              <label class="option-card"><input type="radio" name="profile" value="{{ p }}" {{ 'checked' if inv.profile == p }}>
+                <span><b>{{ _(PROFILE_LABELS[p]) }}</b><p>{{ desc }}</p></span></label>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="field">
+            <label>{{ _('Type') }}</label>
+            <div class="segmented">
+              {% for t in ['SATIS', 'TEVKIFAT', 'ISTISNA', 'IADE'] %}
+              <label><input type="radio" name="type_code" value="{{ t }}" {{ 'checked' if inv.type_code == t }}><span>{{ _(TYPE_LABELS[t]) }}</span></label>
+              {% endfor %}
+            </div>
+          </div>
+          <div data-show-type="TEVKIFAT">
+            <div class="field"><label>{{ _('Withholding code') }}</label>
+              <select name="withholding_code">{% for code, (name, rate) in withholding_codes.items() %}<option value="{{ code }}" data-rate="{{ rate }}" {{ 'selected' if inv.withholding_code == code }}>{{ code }} · {{ name }} ({{ rate // 10 }}/10)</option>{% endfor %}</select></div>
+            <div class="field"><label>{{ _('Withheld share of VAT (%)') }}</label><input type="number" name="withholding_rate" min="0" max="100" step="10" value="{{ inv.withholding_rate or 70 }}"></div>
+          </div>
+          <div data-show-type="IADE">
+            <div class="form-row">
+              <div class="field"><label class="req">{{ _('Original invoice no') }}</label><input type="text" name="return_ref_number" value="{{ inv.return_ref_number or '' }}" class="mono" maxlength="16"></div>
+              <div class="field"><label>{{ _('Original date') }}</label><input type="date" name="return_ref_date" value="{{ inv.return_ref_date.isoformat() if inv.return_ref_date else '' }}"></div>
+            </div>
+          </div>
+          <div class="field">
+            <label>{{ _('VAT exemption code') }}</label>
+            <select name="exemption_code"><option value="">{{ _('None (only needed for 0% VAT lines)') }}</option>
+              {% for code, name in exemption_codes.items() %}<option value="{{ code }}" {{ 'selected' if inv.exemption_code == code }}>{{ code }} · {{ name }}</option>{% endfor %}</select>
+          </div>
+          <div class="form-row">
+            <div class="field"><label>{{ _('Issue date') }}</label><input type="date" name="issue_date" value="{{ inv.issue_date.isoformat() }}"></div>
+            <div class="field"><label>{{ _('Due date') }}</label><input type="date" name="due_date" value="{{ inv.due_date.isoformat() if inv.due_date else '' }}"></div>
+          </div>
+          <div class="field" style="margin-bottom:0"><label>{{ _('Customer order no') }}</label><input type="text" name="order_ref" value="{{ inv.order_ref or '' }}"></div>
+        </div>
+        <div class="card-foot" style="display:grid;gap:8px">
+          <button class="btn btn-primary btn-block" name="action" value="issue_send">{{ icon('send') }} {{ _('Issue & send') }}</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn" style="flex:1" name="action" value="save">{{ _('Save draft') }}</button>
+            <button class="btn" style="flex:1" name="action" value="issue">{{ _('Issue only') }}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}

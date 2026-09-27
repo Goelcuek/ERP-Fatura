@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import empty, pager as pagerbar %}
+{% block title %}{{ _('Service orders') }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ _('Service orders') }}</h1><div class="sub">{{ _('Every device that comes through the door, from intake to delivery.') }}</div></div>
+  <div class="actions"><a class="btn btn-primary" href="{{ url_for('orders.new') }}">{{ icon('plus') }} {{ _('New service order') }}</a></div>
+</div>
+<div class="card">
+  <div class="tabs">
+    {% for st in ['open', 'received', 'diagnosing', 'awaiting_approval', 'in_repair', 'awaiting_parts', 'ready', 'delivered', 'cancelled', 'all'] %}
+      <a href="{{ url_for('orders.index', status=st, q=q) }}" class="{{ 'active' if status == st }}">
+        {% if st == 'open' %}{{ _('Open') }}{% elif st == 'all' %}{{ _('All') }}{% else %}{{ _(STATUS_LABELS[st]) }}{% endif %}
+        <span class="pill">{{ counts.get(st, 0) }}</span>
+      </a>
+    {% endfor %}
+  </div>
+  <form class="toolbar">
+    <input type="hidden" name="status" value="{{ status }}">
+    <div class="search">{{ icon('search', 'sm') }}<input type="search" name="q" value="{{ q }}" placeholder="{{ _('Order no, customer, brand, serial…') }}"></div>
+  </form>
+  {% if pager.items %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>{{ _('Order') }}</th><th>{{ _('Customer') }}</th><th>{{ _('Device') }}</th><th>{{ _('Technician') }}</th><th>{{ _('Status') }}</th><th>{{ _('Promised') }}</th><th class="num">{{ _('Amount') }}</th></tr></thead>
+    <tbody>
+    {% for o in pager.items %}
+      {% set t = o.totals() %}
+      <tr class="clickable" data-href="{{ url_for('orders.view', oid=o.id) }}">
+        <td class="nowrap"><a class="primary" href="{{ url_for('orders.view', oid=o.id) }}">{{ o.number }}</a>
+          <div class="secondary">{{ o.received_at|d }}</div></td>
+        <td class="ellipsis" style="max-width:240px"><span class="primary">{{ o.contact.name }}</span><div class="secondary">{{ o.contact.phone }}</div></td>
+        <td><div class="primary">{{ o.device_label }}</div><div class="secondary">{{ o.device_type }}{% if o.serial_no %} · S/N {{ o.serial_no }}{% endif %}</div></td>
+        <td class="muted">{{ o.technician.full_name if o.technician else '—' }}</td>
+        <td class="nowrap">{{ status_badge(o.status) }}
+          {% if o.priority == 'high' %}<span class="tag red">{{ _('Urgent') }}</span>{% endif %}
+          {% if o.under_warranty %}<span class="tag green">{{ _('Warranty') }}</span>{% endif %}</td>
+        <td class="nowrap {{ 'neg' if o.is_open and o.promised_date and o.promised_date < today() }}">{{ o.promised_date|d or '—' }}</td>
+        <td class="num">{{ t.payable|money(blank_zero=True) }}{% if o.invoice_id %}<div class="secondary">{{ _('Invoiced') }}</div>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {{ pagerbar(pager) }}
+  {% else %}
+    {{ empty('wrench', _('No service orders here'), _('Create one when a customer drops off a tool.'), url_for('orders.new'), _('New service order')) }}
+  {% endif %}
+</div>
+{% endblock %}

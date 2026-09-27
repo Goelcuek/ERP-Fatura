@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import empty, pager as pagerbar %}
+{% block title %}{{ _('Invoices') }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ _('Invoices') }}</h1><div class="sub">{{ _('e-Fatura and e-Arşiv invoices sent through your integrator.') }}</div></div>
+  <div class="actions">
+    <details class="menu">
+      <summary class="btn">{{ icon('download') }} {{ _('Export') }} {{ icon('chevron-down', 'sm') }}</summary>
+      <div class="menu-panel">
+        <a href="{{ url_for('reports.export', what='invoices', **({'from': dfrom.isoformat()} if dfrom else {})) }}">{{ _('Invoice list (CSV)') }}</a>
+        <a href="{{ url_for('reports.export', what='invoice-lines', **({'from': dfrom.isoformat()} if dfrom else {})) }}">{{ _('Invoice lines (CSV)') }}</a>
+      </div>
+    </details>
+    <a class="btn btn-primary" href="{{ url_for('invoices.new') }}">{{ icon('plus') }} {{ _('New invoice') }}</a>
+  </div>
+</div>
+<div class="card">
+  <div class="tabs">
+    {% for st, label in [('', _('All')), ('open', _('Unpaid')), ('draft', _('Drafts')), ('sent', _('Sent')), ('accepted', _('Accepted')), ('exported', _('Exported')), ('error', _('Errors')), ('rejected', _('Rejected')), ('cancelled', _('Cancelled'))] %}
+      <a href="{{ url_for('invoices.index', status=st, q=q) }}" class="{{ 'active' if status == st }}">{{ label }}</a>
+    {% endfor %}
+  </div>
+  <form class="toolbar">
+    <input type="hidden" name="status" value="{{ status }}">
+    <div class="search">{{ icon('search', 'sm') }}<input type="search" name="q" value="{{ q }}" placeholder="{{ _('Invoice no, customer, VKN…') }}"></div>
+    <input type="date" name="from" value="{{ dfrom.isoformat() if dfrom else '' }}" style="width:auto" aria-label="{{ _('From') }}">
+    <input type="date" name="to" value="{{ dto.isoformat() if dto else '' }}" style="width:auto" aria-label="{{ _('To') }}">
+    <button class="btn btn-sm">{{ _('Filter') }}</button>
+  </form>
+  {% if pager.items %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>{{ _('Invoice') }}</th><th>{{ _('Customer') }}</th><th>{{ _('Date') }}</th><th>{{ _('Due') }}</th><th>{{ _('Status') }}</th><th class="num">{{ _('Amount') }}</th><th class="num">{{ _('Open') }}</th></tr></thead>
+    <tbody>
+    {% for i in pager.items %}
+      <tr class="clickable" data-href="{{ url_for('invoices.view', iid=i.id) }}">
+        <td class="nowrap"><a class="primary mono" href="{{ url_for('invoices.view', iid=i.id) }}">{{ i.number or _('Draft') }}</a>
+          <div class="secondary">{{ _(PROFILE_LABELS[i.profile]) }}{% if i.type_code != 'SATIS' %} · {{ _(TYPE_LABELS[i.type_code]) }}{% endif %}</div></td>
+        <td class="ellipsis" style="max-width:260px"><span class="primary">{{ i.contact.name }}</span><div class="secondary">{{ i.contact.tax_id }}</div></td>
+        <td class="nowrap">{{ i.issue_date|d }}</td>
+        <td class="nowrap {{ 'neg' if i.is_overdue }}">{{ i.due_date|d or '—' }}</td>
+        <td>{{ status_badge(i.status) }}</td>
+        <td class="num">{{ ('−' if i.type_code == 'IADE' else '') }}{{ i.payable|money }}</td>
+        <td class="num {{ 'neg strong' if i.is_overdue }}">{{ i.open_amount|money(blank_zero=True) }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+    <tfoot><tr><td colspan="5">{{ _('{n} invoices', n=count) }}</td><td class="num">{{ sum_payable|money }}</td><td></td></tr></tfoot>
+  </table></div>
+  {{ pagerbar(pager) }}
+  {% else %}
+    {{ empty('file', _('No invoices found'), _('Create an invoice directly or from a finished service order.'), url_for('invoices.new'), _('New invoice')) }}
+  {% endif %}
+</div>
+{% endblock %}

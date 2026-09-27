@@ -1,0 +1,20 @@
+{% extends "auth/_layout.html" %}
+{% block title %}{{ _('Sign in') }}{% endblock %}
+{% block content %}
+<div class="auth-card">
+  <h1>{{ _('Sign in') }}</h1>
+  <p class="sub">{{ _('Welcome back. Enter your details to continue.') }}</p>
+  <form method="post">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <div class="field">
+      <label for="username">{{ _('Username') }}</label>
+      <input type="text" id="username" name="username" autocomplete="username" autofocus required>
+    </div>
+    <div class="field">
+      <label for="password">{{ _('Password') }}</label>
+      <input type="password" id="password" name="password" autocomplete="current-password" required>
+    </div>
+    <button class="btn btn-primary btn-lg btn-block">{{ _('Sign in') }}</button>
+  </form>
+</div>
+{% endblock %}

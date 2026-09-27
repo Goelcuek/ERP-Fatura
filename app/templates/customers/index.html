@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import empty %}
+{% block title %}{{ _('Customers') }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ _('Customers & suppliers') }}</h1><div class="sub">{{ _('{n} records', n=contacts|length) }}</div></div>
+  <div class="actions">
+    <a class="btn" href="{{ url_for('reports.export', what='contacts') }}">{{ icon('download') }} {{ _('Export') }}</a>
+    <a class="btn btn-primary" href="{{ url_for('contacts.new', kind=kind or 'customer') }}">{{ icon('plus') }} {{ _('New contact') }}</a>
+  </div>
+</div>
+<div class="card">
+  <div class="tabs">
+    <a href="{{ url_for('contacts.index', q=q) }}" class="{{ 'active' if not kind and not show_archived }}">{{ _('All') }}</a>
+    <a href="{{ url_for('contacts.index', kind='customer', q=q) }}" class="{{ 'active' if kind == 'customer' }}">{{ _('Customers') }}</a>
+    <a href="{{ url_for('contacts.index', kind='supplier', q=q) }}" class="{{ 'active' if kind == 'supplier' }}">{{ _('Suppliers') }}</a>
+    <a href="{{ url_for('contacts.index', archived=1) }}" class="{{ 'active' if show_archived }}">{{ _('Archived') }}</a>
+  </div>
+  <form class="toolbar">
+    <input type="hidden" name="kind" value="{{ kind }}">
+    <div class="search">{{ icon('search', 'sm') }}<input type="search" name="q" value="{{ q }}" placeholder="{{ _('Name, VKN/TCKN, phone, city…') }}"></div>
+  </form>
+  {% if contacts %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>{{ _('Name') }}</th><th>{{ _('VKN / TCKN') }}</th><th>{{ _('Contact') }}</th><th>{{ _('e-Invoice') }}</th><th class="num">{{ _('Balance') }}</th></tr></thead>
+    <tbody>
+    {% for c in contacts %}
+      <tr class="clickable" data-href="{{ url_for('contacts.view', cid=c.id) }}">
+        <td>
+          <div style="display:flex;gap:12px;align-items:center">
+            <span class="avatar" style="background:var(--surface-3);color:var(--text-2)">{{ icon('building' if c.is_company else 'user', 'sm') }}</span>
+            <div style="min-width:0"><a class="primary" href="{{ url_for('contacts.view', cid=c.id) }}">{{ c.name }}</a>
+              <div class="secondary">{% if c.kind == 'supplier' %}{{ _('Supplier') }}{% elif c.kind == 'both' %}{{ _('Customer & supplier') }}{% else %}{{ _('Customer') }}{% endif %}{% if c.city %} · {{ c.district }}{{ ', ' if c.district }}{{ c.city }}{% endif %}</div></div>
+          </div>
+        </td>
+        <td class="tnum">{{ c.tax_id or '—' }}{% if c.tax_office %}<div class="secondary">{{ c.tax_office }}</div>{% endif %}</td>
+        <td>{{ c.phone or '' }}<div class="secondary">{{ c.email or '' }}</div></td>
+        <td>{% if c.efatura_user %}<span class="tag blue">e-Fatura</span>{% else %}<span class="tag">e-Arşiv</span>{% endif %}{% if c.withholding_buyer %} <span class="tag amber">{{ _('Withholding') }}</span>{% endif %}</td>
+        {% set b = balances[c.id] %}
+        <td class="num {{ 'strong' if b > 0 }} {{ 'neg' if b < 0 }}">{{ b|money(blank_zero=True) }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}
+    {{ empty('users', _('No contacts found'), _('Add your first customer to start creating service orders.'), url_for('contacts.new'), _('New contact')) }}
+  {% endif %}
+</div>
+{% endblock %}

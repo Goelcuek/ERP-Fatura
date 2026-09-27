@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import month_chart, empty %}
+{% block title %}{{ _('Dashboard') }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{{ _('Good day, {name}', name=(g.user.full_name or g.user.username).split()[0]) }}</h1>
+    <div class="sub">{{ _('Here is what is happening in the workshop today.') }}</div>
+  </div>
+</div>
+
+{% if backup_warning %}
+<div class="alert alert-warning" style="margin-bottom:16px">
+  {{ icon('warning') }}
+  <div class="body">
+    <b>{% if backup_warning == 'error' %}{{ _('The last automatic backup failed.') }}{% elif backup_warning == 'never' %}{{ _('No backup has been taken yet.') }}{% else %}{{ _('The last backup is older than expected.') }}{% endif %}</b>
+    <p>{{ _('Your data lives on this computer only. Check the backup settings.') }} <a href="{{ url_for('settings.backup') if g.user.is_admin else '#' }}">{{ _('Open backups') }} →</a></p>
+  </div>
+</div>
+{% endif %}
+
+<div class="grid grid-4">
+  <a class="card stat link" href="{{ url_for('orders.index') }}">
+    <div class="label">{{ icon('wrench') }} {{ _('Open service orders') }}</div>
+    <div class="value">{{ open_total }}</div>
+    <div class="meta">{{ _('{n} ready for pickup', n=status_counts.get('ready', 0)) }}</div>
+  </a>
+  <a class="card stat link" href="{{ url_for('reports.index') }}">
+    <div class="label">{{ icon('trend') }} {{ _('Sales this month') }}</div>
+    <div class="value">{{ month_sales|money }}</div>
+    <div class="meta">{{ _('Expenses') }}: {{ month_expense|money }} · {{ _('net, excl. VAT') }}</div>
+  </a>
+  <a class="card stat link" href="{{ url_for('reports.receivables') }}">
+    <div class="label">{{ icon('clock') }} {{ _('Receivables') }}</div>
+    <div class="value">{{ receivable|money }}</div>
+    <div class="meta">{% if overdue_total %}<span class="neg">{{ overdue_total|money }} {{ _('overdue') }}</span>{% else %}{{ _('Nothing overdue') }}{% endif %}</div>
+  </a>
+  <a class="card stat link" href="{{ url_for('books.index') }}">
+    <div class="label">{{ icon('wallet') }} {{ _('Cash & bank') }}</div>
+    <div class="value">{{ cash|money }}</div>
+    <div class="meta">{{ _('All accounts combined') }}</div>
+  </a>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <div class="status-strip">
+    {% for st in ['received', 'diagnosing', 'awaiting_approval', 'in_repair', 'awaiting_parts', 'ready'] %}
+    <a href="{{ url_for('orders.index', status=st) }}">
+      {{ status_badge(st) }}
+      <div class="n">{{ status_counts.get(st, 0) }}</div>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="split-wide" style="margin-top:16px">
+  <div class="stack">
+    <div class="card" data-label-a="{{ _('Sales') }}" data-label-b="{{ _('Expenses') }}">
+      <div class="card-head">
+        <div><h2>{{ _('Sales and expenses') }}</h2><div class="sub">{{ _('Last 12 months · net amounts excluding VAT') }}</div></div>
+        <div class="legend"><span><i style="background:var(--series-1)"></i>{{ _('Sales') }}</span><span><i style="background:var(--series-2)"></i>{{ _('Expenses') }}</span></div>
+      </div>
+      <div class="card-body">{{ month_chart(series) }}</div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div><h2>{{ _('Workshop queue') }}</h2><div class="sub">{{ _('Open orders by promised date') }}</div></div>
+        <a class="btn btn-sm btn-ghost" href="{{ url_for('orders.index') }}">{{ _('View all') }} {{ icon('chevron-right', 'sm') }}</a>
+      </div>
+      {% if open_orders %}
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>{{ _('Order') }}</th><th>{{ _('Device') }} · {{ _('Customer') }}</th><th>{{ _('Status') }}</th><th class="num">{{ _('Promised') }}</th></tr></thead>
+        <tbody>
+        {% for o in open_orders %}
+          <tr class="clickable" data-href="{{ url_for('orders.view', oid=o.id) }}">
+            <td class="nowrap"><a class="primary" href="{{ url_for('orders.view', oid=o.id) }}">{{ o.number }}</a>
+              <div class="secondary">{% if o.priority == 'high' %}<span class="tag red">{{ _('Urgent') }}</span> {% endif %}{{ o.received_at|d }}</div></td>
+            <td style="min-width:0"><div class="primary">{{ o.device_label }} <span class="secondary">· {{ o.device_type }}</span></div><div class="secondary ellipsis" style="max-width:320px">{{ o.contact.name }}</div></td>
+            <td>{{ status_badge(o.status) }}</td>
+            <td class="num {{ 'neg' if o.promised_date and o.promised_date < today() and o.status != 'ready' }}">{{ o.promised_date|d }}<div class="secondary">{{ o.promised_date|reldays }}</div></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table></div>
+      {% else %}
+        {{ empty('inbox', _('The workshop queue is empty'), _('New repair jobs will show up here.'), url_for('orders.new'), _('New service order')) }}
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <div class="card-head"><h2>{{ _('Overdue invoices') }}</h2><a class="btn btn-sm btn-ghost" href="{{ url_for('invoices.index', status='open') }}">{{ _('All open') }}</a></div>
+      {% if overdue %}
+      <ul class="list">
+        {% for i in overdue %}
+        <li>
+          <div class="grow">
+            <a class="title ellipsis" style="display:block" href="{{ url_for('invoices.view', iid=i.id) }}">{{ i.contact.name }}</a>
+            <div class="small muted">{{ i.number }} · {{ _('due') }} {{ i.due_date|d }} ({{ i.due_date|reldays }})</div>
+          </div>
+          <div class="num strong">{{ i.open_amount|money }}</div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="card-body muted small">{{ icon('check-circle', 'sm') }} {{ _('No overdue invoices. Nice.') }}</div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>{{ _('Low stock') }}</h2><a class="btn btn-sm btn-ghost" href="{{ url_for('products.index', low=1) }}">{{ _('View') }}</a></div>
+      {% if low_stock %}
+      <ul class="list">
+        {% for p in low_stock %}
+        <li><div class="grow"><div class="title ellipsis">{{ p.name }}</div><div class="small muted">{{ p.code }}</div></div>
+          <span class="tag {{ 'red' if p.stock_qty <= 0 else 'amber' }}">{{ p.stock_qty|num(None) }} / {{ p.min_stock|num(None) }}</span></li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="card-body muted small">{{ _('All parts are above their minimum stock.') }}</div>
+      {% endif %}
+    </div>
+
+    {% if drafts %}
+    <a class="card stat link" href="{{ url_for('invoices.index', status='draft') }}">
+      <div class="label">{{ icon('file') }} {{ _('Draft invoices waiting') }}</div>
+      <div class="value">{{ drafts }}</div>
+      <div class="meta">{{ _('Review and issue them') }} →</div>
+    </a>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

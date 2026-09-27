@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import empty %}
+{% block title %}{{ _('Customer balances') }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('reports.index') }}">{{ _('Reports') }}</a>{{ icon('chevron-right', 'sm') }}<span>{{ _('Customer balances') }}</span></div>
+<div class="page-head"><div><h1>{{ _('Customer balances') }}</h1><div class="sub">{{ _('Who owes you, and whom you owe.') }}</div></div></div>
+<div class="grid grid-2" style="margin-bottom:16px">
+  <div class="card stat"><div class="label">{{ icon('in') }} {{ _('Receivable') }}</div><div class="value">{{ receivable|money }}</div></div>
+  <div class="card stat"><div class="label">{{ icon('out') }} {{ _('Payable') }}</div><div class="value">{{ payable|money }}</div></div>
+</div>
+<div class="card">
+  {% if rows %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>{{ _('Contact') }}</th><th>{{ _('Phone') }}</th><th class="num">{{ _('Overdue') }}</th><th class="num">{{ _('Balance') }}</th><th></th></tr></thead>
+    <tbody>{% for r in rows %}
+      <tr class="clickable" data-href="{{ url_for('contacts.view', cid=r.c.id, tab='ledger') }}">
+        <td><a class="primary" href="{{ url_for('contacts.view', cid=r.c.id, tab='ledger') }}">{{ r.c.name }}</a><div class="secondary">{{ r.c.tax_id }}</div></td>
+        <td>{{ r.c.phone }}</td>
+        <td class="num {{ 'neg' if r.overdue }}">{{ r.overdue|money(blank_zero=True) }}</td>
+        <td class="num strong {{ 'neg' if r.balance < 0 }}">{{ r.balance|money }}</td>
+        <td class="actions">{% if r.balance > 0 %}<a class="btn btn-sm" href="{{ url_for('books.tx_new', kind='collection', contact_id=r.c.id) }}">{{ _('Receive') }}</a>{% else %}<a class="btn btn-sm" href="{{ url_for('books.tx_new', kind='payment', contact_id=r.c.id) }}">{{ _('Pay') }}</a>{% endif %}</td>
+      </tr>{% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}{{ empty('check-circle', _('All accounts are settled')) }}{% endif %}
+</div>
+{% endblock %}

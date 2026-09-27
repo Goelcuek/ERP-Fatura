@@ -1,0 +1,9 @@
+services:
+  erp:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      # everything the app stores lives here: database, invoice XML, backups, secret key
+      - ./data:/data

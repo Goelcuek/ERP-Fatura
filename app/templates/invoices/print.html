@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="{{ current_lang() }}">
+<head>
+<meta charset="utf-8">
+<title>{{ inv.number or _('Draft') }}</title>
+<style>
+  @page { size: A4; margin: 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Inter", "Segoe UI", Roboto, Arial, sans-serif; color: #101828; font-size: 11.5px; margin: 0; background: #f2f4f7; }
+  .sheet { background: #fff; max-width: 210mm; margin: 24px auto; padding: 16mm 14mm; box-shadow: 0 8px 24px rgba(16,24,40,.12); border-radius: 6px; position: relative; }
+  .draft-mark { position: absolute; top: 40%; left: 0; right: 0; text-align: center; font-size: 90px; font-weight: 800; color: rgba(240,68,56,.12); transform: rotate(-18deg); pointer-events: none; }
+  .top { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: start; }
+  .co b { font-size: 14px; display: block; margin-bottom: 4px; }
+  .co div, .cu div { color: #475467; line-height: 1.5; }
+  .title { text-align: center; }
+  .title .kind { font-size: 18px; font-weight: 800; letter-spacing: .04em; }
+  .title .sub { font-size: 10px; color: #667085; letter-spacing: .06em; text-transform: uppercase; }
+  table { border-collapse: collapse; width: 100%; }
+  .meta { justify-self: end; width: 100%; max-width: 260px; }
+  .meta td { border: 1px solid #d0d5dd; padding: 4px 6px; }
+  .meta td:first-child { font-weight: 600; background: #f9fafb; white-space: nowrap; }
+  .cu { margin-top: 18px; border-top: 1px solid #d0d5dd; border-bottom: 1px solid #d0d5dd; padding: 10px 0; width: 60%; }
+  .cu .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: #667085; }
+  .cu b { font-size: 13px; color: #101828; }
+  .ettn { margin-top: 10px; font-size: 11px; }
+  .ettn b { font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .lines { margin-top: 16px; }
+  .lines th { background: #f2f4f7; border: 1px solid #d0d5dd; padding: 6px; font-size: 10.5px; text-align: left; }
+  .lines td { border: 1px solid #d0d5dd; padding: 6px; vertical-align: top; }
+  .r { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .sum { margin-left: auto; width: 320px; margin-top: 10px; }
+  .sum td { border: 1px solid #d0d5dd; padding: 5px 8px; }
+  .sum td:first-child { font-weight: 600; background: #f9fafb; }
+  .sum tr.grand td { font-size: 13px; font-weight: 800; }
+  .notes { margin-top: 16px; border: 1px solid #d0d5dd; padding: 8px 10px; border-radius: 4px; white-space: pre-line; color: #344054; }
+  .foot { margin-top: 14px; font-size: 10px; color: #667085; }
+  .toolbar { max-width: 210mm; margin: 16px auto 0; display: flex; gap: 8px; justify-content: flex-end; }
+  .toolbar a, .toolbar button { font: inherit; font-size: 13px; padding: 8px 14px; border-radius: 8px; border: 1px solid #d0d5dd; background: #fff; color: #344054; cursor: pointer; text-decoration: none; font-weight: 600; }
+  .toolbar button { background: #2563eb; color: #fff; border-color: #2563eb; }
+  @media print { body { background: #fff; } .sheet { box-shadow: none; margin: 0; padding: 0; max-width: none; } .toolbar { display: none; } }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <a href="{{ url_for('invoices.view', iid=inv.id) }}">← {{ _('Back') }}</a>
+  <button onclick="window.print()">{{ _('Print / Save as PDF') }}</button>
+</div>
+<div class="sheet">
+  {% if inv.is_draft %}<div class="draft-mark">{{ _('DRAFT') }}</div>{% endif %}
+  <div class="top">
+    <div class="co">
+      <b>{{ company.name }}</b>
+      <div>{{ company.address }}</div>
+      <div>{{ company.district }} / {{ company.city }}</div>
+      <div>{{ _('Tel') }}: {{ company.phone }}</div>
+      {% if company.email %}<div>{{ company.email }}</div>{% endif %}
+      <div>{{ _('Tax office') }}: {{ company.tax_office }}</div>
+      <div>{{ 'TCKN' if company.tax_id|length == 11 else 'VKN' }}: {{ company.tax_id }}</div>
+      {% if company.mersis %}<div>MERSİS: {{ company.mersis }}</div>{% endif %}
+    </div>
+    <div class="title">
+      <div class="kind">{{ 'e-ARŞİV FATURA' if inv.is_earsiv else 'e-FATURA' }}</div>
+      <div class="sub">{{ _('Informational copy') }}</div>
+    </div>
+    <table class="meta">
+      <tr><td>{{ _('Customization no') }}</td><td>TR1.2</td></tr>
+      <tr><td>{{ _('Scenario') }}</td><td>{{ inv.profile }}</td></tr>
+      <tr><td>{{ _('Invoice type') }}</td><td>{{ inv.type_code }}</td></tr>
+      <tr><td>{{ _('Invoice no') }}</td><td>{{ inv.number or '—' }}</td></tr>
+      <tr><td>{{ _('Invoice date') }}</td><td>{{ inv.issue_date|d }}{% if inv.issue_time %} {{ inv.issue_time.strftime('%H:%M') }}{% endif %}</td></tr>
+      {% if inv.due_date %}<tr><td>{{ _('Due date') }}</td><td>{{ inv.due_date|d }}</td></tr>{% endif %}
+      {% if inv.return_ref_number %}<tr><td>{{ _('Returned invoice') }}</td><td>{{ inv.return_ref_number }}</td></tr>{% endif %}
+    </table>
+  </div>
+
+  <div class="cu">
+    <div class="lbl">{{ _('Bill to') }}</div>
+    <b>{{ inv.contact.name }}</b>
+    <div>{{ inv.contact.display_address }}</div>
+    <div>{{ _('Tax office') }}: {{ inv.contact.tax_office or '—' }} · {{ inv.contact.id_scheme }}: {{ inv.contact.tax_id or '11111111111' }}</div>
+    {% if inv.contact.email %}<div>{{ inv.contact.email }}</div>{% endif %}
+  </div>
+  <div class="ettn">ETTN: <b>{{ inv.uuid|upper }}</b></div>
+
+  <table class="lines">
+    <tr><th>#</th><th>{{ _('Description') }}</th><th class="r">{{ _('Qty') }}</th><th class="r">{{ _('Unit price') }}</th><th class="r">{{ _('Disc.') }}</th><th class="r">{{ _('VAT %') }}</th><th class="r">{{ _('VAT') }}</th><th class="r">{{ _('Amount') }}</th></tr>
+    {% for l in inv.lines %}{% set lc = totals.lines[loop.index0] %}
+    <tr><td>{{ loop.index }}</td><td>{{ l.description }}</td><td class="r">{{ l.qty|num(None) }} {{ _(UNITS.get(l.unit, l.unit)) }}</td><td class="r">{{ l.unit_price|money }}</td>
+      <td class="r">{{ lc.discount|money(blank_zero=True) }}</td><td class="r">%{{ l.vat_rate }}</td><td class="r">{{ lc.vat|money }}</td><td class="r">{{ lc.net|money }}</td></tr>
+    {% endfor %}
+  </table>
+
+  <table class="sum">
+    <tr><td>{{ _('Goods/services total') }}</td><td class="r">{{ totals.gross|money }}</td></tr>
+    {% if totals.discount %}<tr><td>{{ _('Total discount') }}</td><td class="r">{{ totals.discount|money }}</td></tr>{% endif %}
+    {% for rate, b in totals.vat_breakdown.items() %}
+    <tr><td>{{ _('Calculated VAT') }} (%{{ rate }})</td><td class="r">{{ b.vat|money }}</td></tr>
+    {% endfor %}
+    {% if totals.withholding %}<tr><td>{{ _('Withheld VAT') }} ({{ inv.withholding_code }})</td><td class="r">{{ totals.withholding|money }}</td></tr>{% endif %}
+    <tr><td>{{ _('Total incl. taxes') }}</td><td class="r">{{ totals.total_with_vat|money }}</td></tr>
+    <tr class="grand"><td>{{ _('Amount due') }}</td><td class="r">{{ totals.payable|money }}</td></tr>
+  </table>
+
+  <div class="notes">{{ words }}{% if inv.notes %}
+{{ inv.notes }}{% endif %}{% if inv.exemption_code %}
+{{ _('VAT exemption') }}: {{ inv.exemption_code }} {{ inv.exemption_reason }}{% endif %}{% if company.iban %}
+IBAN: {{ company.iban }}{% endif %}{% if footer %}
+{{ footer }}{% endif %}</div>
+  <div class="foot">{{ _('This is an informational printout. The legally valid document is the electronic invoice delivered through GİB.') }}</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}{{ c.name or _('New contact') }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('contacts.index') }}">{{ _('Customers') }}</a>{{ icon('chevron-right', 'sm') }}<span>{{ _('Edit') if c.id else _('New') }}</span></div>
+<div class="page-head"><div><h1>{{ c.name if c.id else _('New contact') }}</h1></div></div>
+
+<form method="post" class="card" style="max-width:980px">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <div class="form-section">
+    <div class="intro"><h3>{{ _('Identity') }}</h3><p>{{ _('Companies use a 10-digit VKN, individuals an 11-digit TCKN. These appear on invoices.') }}</p></div>
+    <div>
+      <div class="field" style="display:flex;gap:12px;flex-wrap:wrap">
+        <div class="segmented">
+          <label><input type="radio" name="is_company" value="1" {{ 'checked' if c.is_company }} data-toggle-company><span>{{ icon('building', 'sm') }} {{ _('Company') }}</span></label>
+          <label><input type="radio" name="is_company" value="0" {{ 'checked' if not c.is_company }} data-toggle-company><span>{{ icon('user', 'sm') }} {{ _('Individual') }}</span></label>
+        </div>
+        <div class="segmented">
+          {% for k, label in [('customer', _('Customer')), ('supplier', _('Supplier')), ('both', _('Both'))] %}
+          <label><input type="radio" name="kind" value="{{ k }}" {{ 'checked' if c.kind == k }}><span>{{ label }}</span></label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="field" data-company-only><label class="req">{{ _('Company title') }}</label><input type="text" name="name" value="{{ c.name or '' }}" placeholder="{{ _('e.g. Yıldız İnşaat A.Ş.') }}"></div>
+      <div class="form-row" data-person-only>
+        <div class="field"><label class="req">{{ _('First name') }}</label><input type="text" name="first_name" value="{{ c.first_name or '' }}"></div>
+        <div class="field"><label class="req">{{ _('Last name') }}</label><input type="text" name="last_name" value="{{ c.last_name or '' }}"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>{{ _('VKN / TCKN') }}</label><input type="text" name="tax_id" value="{{ c.tax_id or '' }}" inputmode="numeric" maxlength="11" class="tnum"></div>
+        <div class="field"><label>{{ _('Tax office') }}</label><input type="text" name="tax_office" value="{{ c.tax_office or '' }}"></div>
+      </div>
+    </div>
+  </div>
+  <div class="form-section">
+    <div class="intro"><h3>{{ _('Contact & address') }}</h3><p>{{ _('District and city are required on e-invoices.') }}</p></div>
+    <div>
+      <div class="form-row">
+        <div class="field"><label>{{ _('Phone') }}</label><input type="tel" name="phone" value="{{ c.phone or '' }}"></div>
+        <div class="field"><label>{{ _('Email') }}</label><input type="email" name="email" value="{{ c.email or '' }}"><div class="hint">{{ _('e-Arşiv invoices are emailed here by the integrator.') }}</div></div>
+      </div>
+      <div class="field"><label>{{ _('Contact person') }}</label><input type="text" name="contact_person" value="{{ c.contact_person or '' }}"></div>
+      <div class="field"><label>{{ _('Address') }}</label><input type="text" name="address" value="{{ c.address or '' }}"></div>
+      <div class="form-row four">
+        <div class="field"><label>{{ _('District') }}</label><input type="text" name="district" value="{{ c.district or '' }}"></div>
+        <div class="field"><label>{{ _('City') }}</label><input type="text" name="city" value="{{ c.city or '' }}"></div>
+        <div class="field"><label>{{ _('Postal code') }}</label><input type="text" name="postal_code" value="{{ c.postal_code or '' }}"></div>
+        <div class="field"><label>{{ _('Country') }}</label><input type="text" name="country" value="{{ c.country or 'Türkiye' }}"></div>
+      </div>
+    </div>
+  </div>
+  <div class="form-section">
+    <div class="intro"><h3>{{ _('e-Invoice') }}</h3><p>{{ _('Use “Check e-Fatura status” on the contact page to fill this automatically from GİB.') }}</p></div>
+    <div>
+      <label class="check"><input type="checkbox" name="efatura_user" value="1" {{ 'checked' if c.efatura_user }}>
+        <span>{{ _('Registered e-Fatura user') }}<small>{{ _('Otherwise invoices are issued as e-Arşiv.') }}</small></span></label>
+      <div class="field"><label>{{ _('e-Fatura alias (posta kutusu)') }}</label><input type="text" name="efatura_alias" value="{{ c.efatura_alias or '' }}" placeholder="urn:mail:defaultpk@…" class="mono"></div>
+      <label class="check"><input type="checkbox" name="withholding_buyer" value="1" {{ 'checked' if c.withholding_buyer }}>
+        <span>{{ _('Designated buyer for VAT withholding (tevkifat)') }}<small>{{ _('Public bodies and large taxpayers. New invoices default to withholding code 603 (repair services, 7/10).') }}</small></span></label>
+    </div>
+  </div>
+  <div class="form-section">
+    <div class="intro"><h3>{{ _('Notes') }}</h3></div>
+    <div><textarea name="notes" rows="3">{{ c.notes or '' }}</textarea></div>
+  </div>
+  <div class="form-actions">
+    <a class="btn btn-ghost" href="{{ url_for('contacts.view', cid=c.id) if c.id else url_for('contacts.index') }}">{{ _('Cancel') }}</a>
+    <button class="btn btn-primary">{{ _('Save contact') }}</button>
+  </div>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const f = document.querySelector("form.card");
+  function sync() {
+    const company = f.querySelector("[name=is_company]:checked").value === "1";
+    f.querySelectorAll("[data-company-only]").forEach((e) => e.classList.toggle("hidden", !company));
+    f.querySelectorAll("[data-person-only]").forEach((e) => e.classList.toggle("hidden", company));
+  }
+  f.querySelectorAll("[data-toggle-company]").forEach((r) => r.addEventListener("change", sync));
+  sync();
+})();
+</script>
+{% endblock %}

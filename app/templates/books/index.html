@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import empty %}
+{% block title %}{{ _('Cash & bank') }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ _('Cash & bank') }}</h1><div class="sub">{{ _('Total across all accounts') }}: <b class="tnum" style="color:var(--text)">{{ total|money }}</b></div></div>
+  <div class="actions">
+    <a class="btn" href="{{ url_for('books.tx_new', kind='transfer') }}">{{ icon('transfer') }} {{ _('Transfer') }}</a>
+    <a class="btn" href="{{ url_for('books.tx_new', kind='payment') }}">{{ icon('out') }} {{ _('Pay supplier') }}</a>
+    <a class="btn" href="{{ url_for('books.tx_new', kind='income') }}">{{ icon('plus') }} {{ _('Other income') }}</a>
+    <a class="btn btn-primary" href="{{ url_for('books.tx_new', kind='collection') }}">{{ icon('in') }} {{ _('Receive payment') }}</a>
+  </div>
+</div>
+<div class="grid grid-4">
+  {% for a in accounts %}
+  <a class="card account-card" href="{{ url_for('books.account', aid=a.id) }}">
+    <div class="kind"><span class="icon-tile {{ 'green' if a.kind == 'cash' else ('violet' if a.kind == 'pos' else '') }}">{{ icon({'cash': 'cash', 'bank': 'bank', 'pos': 'card'}[a.kind]) }}</span>
+      <span><b style="color:var(--text);display:block">{{ a.name }}</b>{{ {'cash': _('Cash box'), 'bank': _('Bank account'), 'pos': _('POS / card')}[a.kind] }}</span></div>
+    <div class="bal {{ 'neg' if balances[a.id] < 0 }}">{{ balances[a.id]|money }}</div>
+    {% if a.iban %}<div class="iban">{{ a.iban }}</div>{% endif %}
+  </a>
+  {% endfor %}
+  <a class="card account-card" href="{{ url_for('books.account_form') }}" style="display:grid;place-items:center;border-style:dashed;color:var(--muted);min-height:120px">
+    <span>{{ icon('plus') }} {{ _('Add account') }}</span>
+  </a>
+</div>
+<div class="card" style="margin-top:16px">
+  <div class="card-head"><div><h2>{{ _('Recent transactions') }}</h2></div>
+    <a class="btn btn-sm btn-ghost" href="{{ url_for('reports.export', what='transactions') }}">{{ icon('download', 'sm') }} {{ _('Export') }}</a></div>
+  {% if recent %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>{{ _('Date') }}</th><th>{{ _('Description') }}</th><th>{{ _('Account') }}</th><th class="num">{{ _('Amount') }}</th><th></th></tr></thead>
+    <tbody>{% with txs=recent, show_account=True, balances_row=None %}{% include "books/_tx_rows.html" %}{% endwith %}</tbody>
+  </table></div>
+  {% else %}{{ empty('wallet', _('No transactions yet'), _('Payments you record on invoices and expenses appear here.')) }}{% endif %}
+</div>
+{% endblock %}

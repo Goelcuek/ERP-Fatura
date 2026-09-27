@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import empty, csrf %}
+{% block title %}{{ _('Parts & services') }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ _('Parts & services') }}</h1><div class="sub">{{ _('Spare parts with stock, and labour/services with standard prices.') }}</div></div>
+  <div class="actions">
+    <a class="btn" href="{{ url_for('products.new', kind='service') }}">{{ icon('plus') }} {{ _('New service') }}</a>
+    <a class="btn btn-primary" href="{{ url_for('products.new') }}">{{ icon('plus') }} {{ _('New part') }}</a>
+  </div>
+</div>
+<div class="card">
+  <div class="tabs">
+    <a href="{{ url_for('products.index', q=q) }}" class="{{ 'active' if not kind and not low and not request.args.get('archived') }}">{{ _('All') }}</a>
+    <a href="{{ url_for('products.index', kind='part', q=q) }}" class="{{ 'active' if kind == 'part' }}">{{ _('Parts') }}</a>
+    <a href="{{ url_for('products.index', kind='service', q=q) }}" class="{{ 'active' if kind == 'service' }}">{{ _('Services') }}</a>
+    <a href="{{ url_for('products.index', low=1) }}" class="{{ 'active' if low }}">{{ _('Low stock') }}</a>
+    <a href="{{ url_for('products.index', archived=1) }}" class="{{ 'active' if request.args.get('archived') }}">{{ _('Archived') }}</a>
+  </div>
+  <form class="toolbar"><input type="hidden" name="kind" value="{{ kind }}">
+    <div class="search">{{ icon('search', 'sm') }}<input type="search" name="q" value="{{ q }}" placeholder="{{ _('Code or name…') }}"></div></form>
+  {% if products %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>{{ _('Item') }}</th><th>{{ _('Type') }}</th><th class="num">{{ _('Price') }}</th><th class="num">{{ _('VAT') }}</th><th class="num">{{ _('Stock') }}</th><th class="actions">{{ _('Adjust stock') }}</th><th></th></tr></thead>
+    <tbody>
+    {% for p in products %}
+      <tr>
+        <td><a class="primary" href="{{ url_for('products.edit', pid=p.id) }}">{{ p.name }}</a><div class="secondary mono">{{ p.code or '—' }}</div></td>
+        <td>{% if p.kind == 'part' %}<span class="tag">{{ _('Part') }}</span>{% else %}<span class="tag blue">{{ _('Service') }}</span>{% endif %}</td>
+        <td class="num">{{ p.price|money }}<div class="secondary">/ {{ _(UNITS.get(p.unit, p.unit)) }}</div></td>
+        <td class="num muted">%{{ p.vat_rate }}</td>
+        <td class="num">{% if p.kind == 'part' and p.track_stock %}<span class="tag {{ 'red' if p.stock_qty <= 0 else ('amber' if p.low_stock else '') }}">{{ p.stock_qty|num(None) }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td class="actions">{% if p.kind == 'part' and p.track_stock %}
+          <form method="post" action="{{ url_for('products.stock', pid=p.id) }}" style="display:inline-flex;gap:6px">{{ csrf() }}
+            <input type="hidden" name="mode" value="add">
+            <input type="text" name="qty" inputmode="decimal" class="num" placeholder="+/−" style="width:72px;height:30px" aria-label="{{ _('Quantity') }}">
+            <button class="btn btn-sm">{{ _('Apply') }}</button></form>{% endif %}</td>
+        <td class="actions"><a class="btn btn-sm btn-ghost" href="{{ url_for('products.edit', pid=p.id) }}">{{ icon('edit', 'sm') }}</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}
+    {{ empty('package', _('No items'), _('Add the spare parts and services you sell most often to invoice faster.'), url_for('products.new'), _('New part')) }}
+  {% endif %}
+</div>
+{% endblock %}

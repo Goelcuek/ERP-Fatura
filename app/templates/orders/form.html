@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import contact_picker %}
+{% block title %}{{ o.number or _('New service order') }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('orders.index') }}">{{ _('Service orders') }}</a>{{ icon('chevron-right', 'sm') }}<span>{{ o.number or _('New') }}</span></div>
+<div class="page-head"><div><h1>{{ _('Edit service order') if o.id else _('New service order') }}</h1>
+  <div class="sub">{{ _('Record the device exactly as it was received — this is printed on the customer’s intake receipt.') }}</div></div></div>
+
+<form method="post" class="card" style="max-width:1040px">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <div class="form-section">
+    <div class="intro"><h3>{{ _('Customer') }}</h3><p>{{ _('Search an existing customer or create a new one.') }}</p></div>
+    <div>
+      {{ contact_picker(contact) }}
+      {% if not o.id %}<div class="hint" style="margin-top:8px">{{ _('New customer?') }} <a href="{{ url_for('contacts.new', next='order') }}">{{ _('Create customer') }} →</a></div>{% endif %}
+    </div>
+  </div>
+  <div class="form-section">
+    <div class="intro"><h3>{{ _('Device') }}</h3><p>{{ _('What was brought in, with serial number and accessories.') }}</p></div>
+    <div>
+      <div class="form-row three">
+        <div class="field"><label class="req">{{ _('Device type') }}</label><input type="text" name="device_type" value="{{ o.device_type or '' }}" list="dl-type" placeholder="{{ _('e.g. Hammer drill') }}"></div>
+        <div class="field"><label>{{ _('Brand') }}</label><input type="text" name="brand" value="{{ o.brand or '' }}" list="dl-brand" placeholder="Bosch, Makita…"></div>
+        <div class="field"><label>{{ _('Model') }}</label><input type="text" name="model" value="{{ o.model or '' }}"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>{{ _('Serial number') }}</label><input type="text" name="serial_no" value="{{ o.serial_no or '' }}" class="mono"></div>
+        <div class="field"><label>{{ _('Accessories received') }}</label><input type="text" name="accessories" value="{{ o.accessories or '' }}" placeholder="{{ _('Case, 2 batteries, charger…') }}"></div>
+      </div>
+      <div class="field"><label>{{ _('Customer complaint') }}</label><textarea name="complaint" rows="3" placeholder="{{ _('What does the customer say is wrong?') }}">{{ o.complaint or '' }}</textarea></div>
+      <label class="check"><input type="checkbox" name="under_warranty" value="1" {{ 'checked' if o.under_warranty }}><span>{{ _('Under warranty') }}</span></label>
+    </div>
+  </div>
+  <div class="form-section">
+    <div class="intro"><h3>{{ _('Planning') }}</h3></div>
+    <div class="form-row four">
+      <div class="field"><label>{{ _('Promised date') }}</label><input type="date" name="promised_date" value="{{ o.promised_date.isoformat() if o.promised_date else '' }}"></div>
+      <div class="field"><label>{{ _('Priority') }}</label>
+        <select name="priority">{% for p, l in [('low', _('Low')), ('normal', _('Normal')), ('high', _('Urgent'))] %}<option value="{{ p }}" {{ 'selected' if o.priority == p }}>{{ l }}</option>{% endfor %}</select></div>
+      <div class="field"><label>{{ _('Technician') }}</label>
+        <select name="technician_id"><option value="">—</option>{% for t in technicians %}<option value="{{ t.id }}" {{ 'selected' if o.technician_id == t.id }}>{{ t.full_name or t.username }}</option>{% endfor %}</select></div>
+      <div class="field"><label>{{ _('Estimate (₺)') }}</label><input type="text" inputmode="decimal" name="estimate" class="num" value="{{ o.estimate|inp if o.estimate is not none else '' }}"></div>
+    </div>
+  </div>
+  {% if o.id %}
+  <div class="form-section">
+    <div class="intro"><h3>{{ _('Workshop notes') }}</h3><p>{{ _('Diagnosis and work done are printed on the delivery receipt. Internal notes are not.') }}</p></div>
+    <div>
+      <div class="field"><label>{{ _('Diagnosis') }}</label><textarea name="diagnosis" rows="3">{{ o.diagnosis or '' }}</textarea></div>
+      <div class="field"><label>{{ _('Work done') }}</label><textarea name="work_done" rows="3">{{ o.work_done or '' }}</textarea></div>
+      <div class="field"><label>{{ _('Internal notes') }}</label><textarea name="internal_notes" rows="2">{{ o.internal_notes or '' }}</textarea></div>
+    </div>
+  </div>
+  {% endif %}
+  <div class="form-actions">
+    <a class="btn btn-ghost" href="{{ url_for('orders.view', oid=o.id) if o.id else url_for('orders.index') }}">{{ _('Cancel') }}</a>
+    {% if not o.id %}<button class="btn" name="print" value="1">{{ icon('printer') }} {{ _('Save & print receipt') }}</button>{% endif %}
+    <button class="btn btn-primary">{{ _('Save') }}</button>
+  </div>
+</form>
+<datalist id="dl-type">{% for v in suggestions.device_type %}<option value="{{ v }}">{% endfor %}
+  {% for v in ['Darbeli matkap', 'Avuç taşlama', 'Kırıcı delici', 'Şarjlı vidalama', 'Daire testere', 'Dekupaj testere', 'Planya', 'Kaynak makinesi', 'Kompresör', 'Jeneratör', 'Hidrofor', 'Pompa'] %}{% if v not in suggestions.device_type %}<option value="{{ v }}">{% endif %}{% endfor %}</datalist>
+<datalist id="dl-brand">{% for v in suggestions.brand %}<option value="{{ v }}">{% endfor %}
+  {% for v in ['Bosch', 'Makita', 'DeWalt', 'Metabo', 'Hilti', 'Milwaukee', 'Einhell', 'Black+Decker', 'Stanley', 'Ryobi', 'Hitachi / HiKOKI', 'Festool', 'Magmaweld', 'Rico', 'Ceta Form'] %}{% if v not in suggestions.brand %}<option value="{{ v }}">{% endif %}{% endfor %}</datalist>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "settings/_layout.html" %}
+{% block title %}{{ _('e-Invoice integrator') }}{% endblock %}
+{% block heading %}{{ _('Settings') }}{% endblock %}
+{% block subheading %}{{ _('Choose how invoices reach GİB.') }}{% endblock %}
+{% block settings %}
+<div class="alert alert-info" style="margin-bottom:16px">{{ icon('info') }}<div class="body"><b>{{ _('How e-invoicing works') }}</b>
+  <p>{{ _('This app creates the UBL-TR invoice XML. A GİB-licensed special integrator (özel entegratör) signs it with your company seal and delivers it. You can keep the integrator you already have: use its API if supported, or export XML and upload it in its portal.') }}</p></div></div>
+<form method="post" class="card">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <div class="card-body option-cards">
+    {% for key, cls in registry.items() %}
+    <label class="option-card" style="display:block">
+      <div style="display:flex;gap:12px">
+        <input type="radio" name="integrator" value="{{ key }}" {{ 'checked' if current == key }} data-integ>
+        <span style="flex:1"><b>{{ _(cls.label) }} {% if cls.live %}<span class="tag blue">API</span>{% endif %}{% if current == key %} <span class="tag green">{{ _('Active') }}</span>{% endif %}</b><p>{{ _(cls.description) }}</p></span>
+      </div>
+      {% if cls.fields %}
+      <div class="form-row" data-integ-fields="{{ key }}" style="margin:14px 0 0 28px">
+        {% for f in cls.fields %}{% set val = configs.get(key, {}).get(f.name, f.default) %}
+        <div class="field"><label>{{ _(f.label) }}</label>
+          {% if f.kind == 'select' %}<select name="{{ key }}__{{ f.name }}">{% for opt in f.options %}<option value="{{ opt }}" {{ 'selected' if val == opt }}>{{ opt }}</option>{% endfor %}</select>
+          {% elif f.kind == 'password' %}<input type="password" name="{{ key }}__{{ f.name }}" placeholder="{{ '••••••••  ' ~ _('(saved — leave empty to keep)') if val else '' }}" autocomplete="off">
+          {% else %}<input type="text" name="{{ key }}__{{ f.name }}" value="{{ val }}">{% endif %}
+          {% if f.help %}<div class="hint">{{ _(f.help) }}</div>{% endif %}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </label>
+    {% endfor %}
+  </div>
+  <div class="form-actions">
+    <button class="btn" name="test" value="1">{{ icon('plug') }} {{ _('Save & test connection') }}</button>
+    <button class="btn btn-primary">{{ _('Save') }}</button>
+  </div>
+</form>
+{% endblock %}

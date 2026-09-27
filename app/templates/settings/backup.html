@@ -1,0 +1,95 @@
+{% extends "settings/_layout.html" %}
+{% from "partials/macros.html" import csrf, empty %}
+{% block title %}{{ _('Backups') }}{% endblock %}
+{% block heading %}{{ _('Backups') }}{% endblock %}
+{% block subheading %}{{ _('All data is one database file plus generated invoice XML. A backup is a single zip you can copy anywhere.') }}{% endblock %}
+{% block head_actions %}
+  <a class="btn" href="{{ url_for('settings.backup_download_now') }}">{{ icon('download') }} {{ _('Download backup now') }}</a>
+  <form method="post" action="{{ url_for('settings.backup_create') }}" class="inline">{{ csrf() }}<button class="btn btn-primary">{{ icon('database') }} {{ _('Back up now') }}</button></form>
+{% endblock %}
+{% block settings %}
+<div class="grid grid-3" style="margin-bottom:16px">
+  <div class="card stat"><div class="label">{{ icon('clock') }} {{ _('Last automatic backup') }}</div>
+    <div class="value" style="font-size:18px">{{ s.last_at.replace('T', ' ')[:16] if s.last_at else _('Never') }}</div>
+    <div class="meta">{% if s.enabled %}{{ _('Every {h} hours', h=s.interval_hours) }}{% else %}<span class="neg">{{ _('Automatic backups are off') }}</span>{% endif %}</div></div>
+  <div class="card stat"><div class="label">{{ icon('archive') }} {{ _('Stored backups') }}</div><div class="value">{{ backups|length }}</div>
+    <div class="meta">{{ (backups|sum(attribute='size'))|bytes }}</div></div>
+  <div class="card stat"><div class="label">{{ icon('shield') }} {{ _('Off-site copy') }}</div>
+    <div class="value" style="font-size:18px">{{ _('On') if s.extra_dir else _('Off') }}</div>
+    <div class="meta ellipsis">{{ s.extra_dir or _('Set a second folder below') }}</div></div>
+</div>
+
+{% if s.last_error %}
+<div class="alert alert-error" style="margin-bottom:16px">{{ icon('alert') }}<div class="body"><b>{{ _('The last automatic backup failed') }}</b><p>{{ s.last_error }}</p></div></div>
+{% endif %}
+
+<form method="post" class="card">
+  {{ csrf() }}
+  <div class="form-section">
+    <div class="intro"><h3>{{ _('Automatic backups') }}</h3><p>{{ _('Taken in the background while the app is running.') }}</p></div>
+    <div>
+      <label class="check"><input type="checkbox" name="enabled" value="1" {{ 'checked' if s.enabled }}><span>{{ _('Enable automatic backups') }}</span></label>
+      <div class="form-row">
+        <div class="field"><label>{{ _('Every (hours)') }}</label><input type="number" min="1" name="interval_hours" value="{{ s.interval_hours }}"></div>
+        <div class="field"><label>{{ _('Keep last') }}</label><input type="number" min="1" name="keep" value="{{ s.keep }}"><div class="hint">{{ _('Older automatic backups are deleted. Manual backups are kept.') }}</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="form-section">
+    <div class="intro"><h3>{{ _('Locations') }}</h3><p>{{ _('Tip: point the second folder at a USB disk, NAS share, or a OneDrive / Google Drive synced folder so a copy leaves this computer.') }}</p></div>
+    <div>
+      <div class="field"><label>{{ _('Backup folder') }}</label><input type="text" name="dir" value="{{ s.dir }}" placeholder="{{ location }}" class="mono"><div class="hint">{{ _('Currently') }}: <span class="mono">{{ location }}</span></div></div>
+      <div class="field"><label>{{ _('Second copy folder (optional)') }}</label><input type="text" name="extra_dir" value="{{ s.extra_dir }}" placeholder="D:\Yedek  /  \\NAS\yedek  /  C:\Users\...\OneDrive\Yedek" class="mono"></div>
+      <div class="hint">{{ _('Data folder') }}: <span class="mono">{{ data_dir }}</span></div>
+    </div>
+  </div>
+  <div class="form-actions"><button class="btn btn-primary">{{ _('Save settings') }}</button></div>
+</form>
+
+<div class="card" style="margin-top:16px">
+  <div class="card-head"><div><h2>{{ _('Available backups') }}</h2><div class="sub mono">{{ location }}</div></div></div>
+  {% if backups %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>{{ _('File') }}</th><th>{{ _('Created') }}</th><th class="num">{{ _('Size') }}</th><th></th></tr></thead>
+    <tbody>{% for b in backups %}
+      <tr>
+        <td class="mono small">{{ b.name }}
+          {% if b.name.endswith('-auto.zip') %}<span class="tag">{{ _('auto') }}</span>{% elif 'pre-restore' in b.name %}<span class="tag amber">{{ _('before restore') }}</span>{% else %}<span class="tag blue">{{ _('manual') }}</span>{% endif %}</td>
+        <td class="nowrap">{{ b.mtime|dt }}</td>
+        <td class="num">{{ b.size|bytes }}</td>
+        <td class="actions">
+          <a class="btn btn-sm" href="{{ url_for('settings.backup_download', name=b.name) }}">{{ icon('download', 'sm') }}</a>
+          <form method="post" action="{{ url_for('settings.backup_restore') }}" class="inline" data-restore>{{ csrf() }}
+            <input type="hidden" name="name" value="{{ b.name }}"><input type="hidden" name="confirm" value="">
+            <button class="btn btn-sm">{{ icon('undo', 'sm') }} {{ _('Restore') }}</button></form>
+          <form method="post" action="{{ url_for('settings.backup_delete', name=b.name) }}" class="inline" data-confirm="{{ _('Delete this backup file?') }}">{{ csrf() }}
+            <button class="btn btn-sm btn-ghost btn-danger">{{ icon('trash', 'sm') }}</button></form>
+        </td>
+      </tr>{% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}{{ empty('database', _('No backups yet'), _('Click “Back up now” to create the first one.')) }}{% endif %}
+</div>
+
+<form method="post" action="{{ url_for('settings.backup_restore') }}" enctype="multipart/form-data" class="card" style="margin-top:16px" data-restore>
+  {{ csrf() }}
+  <div class="card-head"><div><h2>{{ _('Restore from a file') }}</h2><div class="sub">{{ _('For example, to move the system to a new computer.') }}</div></div></div>
+  <div class="card-body">
+    <div class="alert alert-warning" style="margin-bottom:16px">{{ icon('warning') }}<div class="body"><b>{{ _('Restoring replaces all current data.') }}</b><p>{{ _('A safety backup of the current data is created automatically first, so this can be undone.') }}</p></div></div>
+    <div class="form-row">
+      <div class="field"><label>{{ _('Backup file (.zip)') }}</label><input type="file" name="file" accept=".zip" class="input" style="padding:6px" required></div>
+    </div>
+    <input type="hidden" name="confirm" value="">
+    <button class="btn btn-danger">{{ icon('upload') }} {{ _('Restore this backup') }}</button>
+  </div>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll("form[data-restore]").forEach((f) => f.addEventListener("submit", (e) => {
+  const answer = prompt({{ _('Restoring replaces ALL current data. Type RESTORE to continue.')|tojson }});
+  if (answer !== "RESTORE") { e.preventDefault(); return; }
+  f.querySelector("[name=confirm]").value = "RESTORE";
+}));
+</script>
+{% endblock %}

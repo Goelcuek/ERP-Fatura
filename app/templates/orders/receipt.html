@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="{{ current_lang() }}">
+<head>
+<meta charset="utf-8">
+<title>{{ o.number }}</title>
+<style>
+  @page { size: A5; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Inter", "Segoe UI", Roboto, Arial, sans-serif; color: #101828; font-size: 12px; margin: 0; background: #f2f4f7; }
+  .sheet { background: #fff; max-width: 148mm; margin: 24px auto; padding: 14mm 12mm; box-shadow: 0 8px 24px rgba(16,24,40,.12); border-radius: 6px; }
+  .head { display: flex; justify-content: space-between; gap: 16px; border-bottom: 2px solid #101828; padding-bottom: 10px; }
+  .co b { font-size: 14px; display: block; }
+  .co div { color: #475467; }
+  .no { text-align: right; }
+  .no .n { font-size: 18px; font-weight: 700; letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+  .no .t { text-transform: uppercase; font-size: 10px; letter-spacing: .08em; color: #667085; }
+  h3 { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: #667085; margin: 16px 0 6px; }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { padding: 5px 0; vertical-align: top; text-align: left; }
+  .kv td:first-child { width: 34%; color: #475467; }
+  .lines th { font-size: 10px; color: #667085; border-bottom: 1px solid #d0d5dd; font-weight: 600; }
+  .lines td { border-bottom: 1px solid #eaecf0; }
+  .r { text-align: right; font-variant-numeric: tabular-nums; }
+  .box { border: 1px solid #d0d5dd; border-radius: 6px; padding: 8px 10px; min-height: 34px; white-space: pre-line; }
+  .terms { font-size: 10px; color: #667085; margin-top: 16px; line-height: 1.45; }
+  .sign { display: flex; gap: 24px; margin-top: 28px; }
+  .sign div { flex: 1; border-top: 1px solid #98a2b3; padding-top: 4px; font-size: 10px; color: #667085; text-align: center; }
+  .toolbar { max-width: 148mm; margin: 16px auto 0; display: flex; gap: 8px; justify-content: flex-end; }
+  .toolbar a, .toolbar button { font: inherit; font-size: 13px; padding: 8px 14px; border-radius: 8px; border: 1px solid #d0d5dd; background: #fff; color: #344054; cursor: pointer; text-decoration: none; font-weight: 600; }
+  .toolbar button { background: #2563eb; color: #fff; border-color: #2563eb; }
+  @media print { body { background: #fff; } .sheet { box-shadow: none; margin: 0; padding: 0; max-width: none; } .toolbar { display: none; } }
+</style>
+</head>
+<body data-auto-print="{{ '1' if auto_print else '0' }}">
+<div class="toolbar">
+  <a href="{{ url_for('orders.view', oid=o.id) }}">← {{ _('Back to order') }}</a>
+  <button onclick="window.print()">{{ _('Print') }}</button>
+</div>
+<div class="sheet">
+  <div class="head">
+    <div class="co">
+      <b>{{ company.name or 'Atölye' }}</b>
+      <div>{{ company.address }}{% if company.district or company.city %}, {{ company.district }} / {{ company.city }}{% endif %}</div>
+      <div>{{ company.phone }}{% if company.email %} · {{ company.email }}{% endif %}</div>
+    </div>
+    <div class="no">
+      <div class="t">{{ _('Delivery receipt') if o.status in ['ready', 'delivered'] else _('Service intake receipt') }}</div>
+      <div class="n">{{ o.number }}</div>
+      <div>{{ o.received_at|dt }}</div>
+    </div>
+  </div>
+
+  <h3>{{ _('Customer') }}</h3>
+  <table class="kv">
+    <tr><td>{{ _('Name') }}</td><td><b>{{ o.contact.name }}</b></td></tr>
+    <tr><td>{{ _('Phone') }}</td><td>{{ o.contact.phone or '—' }}</td></tr>
+  </table>
+
+  <h3>{{ _('Device') }}</h3>
+  <table class="kv">
+    <tr><td>{{ _('Device') }}</td><td><b>{{ o.device_type }}</b> {{ o.brand }} {{ o.model }}</td></tr>
+    <tr><td>{{ _('Serial number') }}</td><td>{{ o.serial_no or '—' }}</td></tr>
+    <tr><td>{{ _('Accessories') }}</td><td>{{ o.accessories or '—' }}</td></tr>
+    <tr><td>{{ _('Warranty') }}</td><td>{{ _('Yes') if o.under_warranty else _('No') }}</td></tr>
+    {% if o.promised_date %}<tr><td>{{ _('Estimated ready') }}</td><td>{{ o.promised_date|d }}</td></tr>{% endif %}
+    {% if o.estimate %}<tr><td>{{ _('Estimate') }}</td><td>{{ o.estimate|money }}</td></tr>{% endif %}
+  </table>
+
+  <h3>{{ _('Customer complaint') }}</h3>
+  <div class="box">{{ o.complaint or '—' }}</div>
+
+  {% if o.status in ['ready', 'delivered'] %}
+    {% if o.work_done %}<h3>{{ _('Work done') }}</h3><div class="box">{{ o.work_done }}</div>{% endif %}
+    {% if o.lines %}
+    {% set t = o.totals() %}
+    <h3>{{ _('Parts & labour') }}</h3>
+    <table class="lines">
+      <tr><th>{{ _('Description') }}</th><th class="r">{{ _('Qty') }}</th><th class="r">{{ _('Total') }}</th></tr>
+      {% for l in o.lines %}<tr><td>{{ l.description }}</td><td class="r">{{ l.qty|num(None) }}</td><td class="r">{{ t.lines[loop.index0].total|money }}</td></tr>{% endfor %}
+      <tr><td colspan="2" class="r"><b>{{ _('Total incl. VAT') }}</b></td><td class="r"><b>{{ t.payable|money }}</b></td></tr>
+    </table>
+    {% endif %}
+  {% endif %}
+
+  <div class="terms">{{ terms }}</div>
+  <div class="sign">
+    <div>{{ _('Received by (workshop)') }}</div>
+    <div>{{ _('Customer signature') }}</div>
+  </div>
+</div>
+<script>if (document.body.dataset.autoPrint === "1") setTimeout(() => window.print(), 300);</script>
+</body>
+</html>

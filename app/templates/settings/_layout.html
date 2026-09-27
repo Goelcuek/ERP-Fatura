@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head"><div><h1>{% block heading %}{% endblock %}</h1><div class="sub">{% block subheading %}{% endblock %}</div></div><div class="actions">{% block head_actions %}{% endblock %}</div></div>
+<div class="settings-layout">
+  <nav class="subnav">
+    <a href="{{ url_for('settings.company') }}" class="{{ 'active' if section == 'company' }}">{{ icon('building') }} {{ _('Company') }}</a>
+    <a href="{{ url_for('settings.invoicing') }}" class="{{ 'active' if section == 'invoicing' }}">{{ icon('file') }} {{ _('Invoicing') }}</a>
+    <a href="{{ url_for('settings.integrator') }}" class="{{ 'active' if section == 'integrator' }}">{{ icon('plug') }} {{ _('e-Invoice integrator') }}</a>
+    <a href="{{ url_for('settings.users') }}" class="{{ 'active' if section == 'users' }}">{{ icon('users') }} {{ _('Users') }}</a>
+    <a href="{{ url_for('settings.backup') }}" class="{{ 'active' if section == 'backup' }}">{{ icon('database') }} {{ _('Backups') }}</a>
+  </nav>
+  <div>{% block settings %}{% endblock %}</div>
+</div>
+{% endblock %}

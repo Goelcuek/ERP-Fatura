@@ -1,0 +1,34 @@
+{% extends "auth/_layout.html" %}
+{% block title %}{{ _('First-time setup') }}{% endblock %}
+{% block content %}
+<div class="auth-card wide">
+  <h1>{{ _('First-time setup') }}</h1>
+  <p class="sub">{{ _('Create the administrator account and enter your company basics. You can change everything later in Settings.') }}</p>
+  <form method="post">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <h3 style="margin-bottom:12px">{{ _('Administrator') }}</h3>
+    <div class="form-row">
+      <div class="field"><label class="req">{{ _('Full name') }}</label><input type="text" name="full_name" value="{{ form.get('full_name', '') }}" required></div>
+      <div class="field"><label class="req">{{ _('Username') }}</label><input type="text" name="username" value="{{ form.get('username', '') }}" required autocomplete="username"></div>
+      <div class="field"><label class="req">{{ _('Password') }}</label><input type="password" name="password" required minlength="8" autocomplete="new-password"></div>
+      <div class="field"><label class="req">{{ _('Repeat password') }}</label><input type="password" name="password2" required minlength="8" autocomplete="new-password"></div>
+    </div>
+    <div class="field">
+      <label>{{ _('Language') }}</label>
+      <div class="segmented">
+        {% for code, name in LANGUAGES.items() %}<label><input type="radio" name="lang" value="{{ code }}" {{ 'checked' if code == 'tr' }}><span>{{ name }}</span></label>{% endfor %}
+      </div>
+    </div>
+    <hr>
+    <h3 style="margin-bottom:12px">{{ _('Company') }}</h3>
+    <div class="form-row">
+      <div class="field span-2"><label>{{ _('Company name') }}</label><input type="text" name="name" value="{{ form.get('name', '') }}"></div>
+      <div class="field"><label>{{ _('VKN / TCKN') }}</label><input type="text" name="tax_id" inputmode="numeric" maxlength="11" value="{{ form.get('tax_id', '') }}"></div>
+      <div class="field"><label>{{ _('Tax office') }}</label><input type="text" name="tax_office" value="{{ form.get('tax_office', '') }}"></div>
+      <div class="field"><label>{{ _('District') }}</label><input type="text" name="district" value="{{ form.get('district', '') }}"></div>
+      <div class="field"><label>{{ _('City') }}</label><input type="text" name="city" value="{{ form.get('city', '') }}"></div>
+    </div>
+    <button class="btn btn-primary btn-lg btn-block">{{ _('Create account and start') }}</button>
+  </form>
+</div>
+{% endblock %}

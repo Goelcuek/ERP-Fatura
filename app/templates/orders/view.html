@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import csrf, line_editor, totals_box %}
+{% block title %}{{ o.number }}{% endblock %}
+{% block content %}
+{% set locked = o.invoice and not o.invoice.is_draft and o.invoice.status != 'cancelled' %}
+<div class="crumbs"><a href="{{ url_for('orders.index') }}">{{ _('Service orders') }}</a>{{ icon('chevron-right', 'sm') }}<span>{{ o.number }}</span></div>
+<div class="page-head">
+  <div>
+    <div class="title-row"><h1>{{ o.device_label }}</h1>{{ status_badge(o.status) }}
+      {% if o.priority == 'high' %}<span class="tag red">{{ _('Urgent') }}</span>{% endif %}
+      {% if o.under_warranty %}<span class="tag green">{{ _('Warranty') }}</span>{% endif %}</div>
+    <div class="sub">{{ o.number }} · {{ o.device_type }} · {{ _('received') }} {{ o.received_at|dt }}</div>
+  </div>
+  <div class="actions">
+    <a class="btn" href="{{ url_for('orders.receipt', oid=o.id) }}" target="_blank">{{ icon('printer') }} {{ _('Print receipt') }}</a>
+    <a class="btn" href="{{ url_for('orders.edit', oid=o.id) }}">{{ icon('edit') }} {{ _('Edit') }}</a>
+    {% if o.invoice and o.invoice.status != 'cancelled' %}
+      <a class="btn btn-primary" href="{{ url_for('invoices.view', iid=o.invoice.id) }}">{{ icon('file') }} {{ _('Open invoice') }}</a>
+    {% else %}
+      <form method="post" action="{{ url_for('orders.make_invoice', oid=o.id) }}" class="inline">{{ csrf() }}
+        <button class="btn btn-primary" {{ 'disabled' if not o.lines }}>{{ icon('file') }} {{ _('Create invoice') }}</button></form>
+    {% endif %}
+  </div>
+</div>
+
+{% set flow = ['received', 'diagnosing', 'awaiting_approval', 'in_repair', 'ready', 'delivered'] %}
+{% set cur = o.status if o.status in flow else ('in_repair' if o.status == 'awaiting_parts' else None) %}
+{% set ci = flow.index(cur) if cur else -1 %}
+<div class="card" style="margin-bottom:16px">
+  {% if o.status == 'cancelled' %}
+  <div class="card-body"><div class="alert alert-error">{{ icon('x') }}<div class="body"><b>{{ _('This order was cancelled.') }}</b></div></div></div>
+  {% else %}
+  <div class="stepper">
+    {% for st in flow %}
+      <div class="step {{ 'done' if loop.index0 < ci or (o.status == 'delivered' and st == 'delivered') }} {{ 'current' if loop.index0 == ci and o.status != 'delivered' }}">
+        <div class="bullet">{% if loop.index0 < ci or o.status == 'delivered' %}{{ icon('check') }}{% endif %}</div>
+        {{ _(STATUS_LABELS[st]) }}{% if st == 'in_repair' and o.status == 'awaiting_parts' %}<div class="small" style="color:var(--orange)">{{ _('Awaiting parts') }}</div>{% endif %}
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="split">
+  <div class="stack">
+    <div class="card">
+      <div class="card-head"><h2>{{ _('Device & complaint') }}</h2></div>
+      <div class="card-body">
+        <dl class="dl">
+          <dt>{{ _('Device') }}</dt><dd>{{ o.device_type or '—' }} · {{ o.brand }} {{ o.model }}</dd>
+          <dt>{{ _('Serial number') }}</dt><dd class="mono">{{ o.serial_no or '—' }}</dd>
+          <dt>{{ _('Accessories') }}</dt><dd>{{ o.accessories or '—' }}</dd>
+          <dt>{{ _('Complaint') }}</dt><dd style="white-space:pre-line">{{ o.complaint or '—' }}</dd>
+          <dt>{{ _('Diagnosis') }}</dt><dd style="white-space:pre-line">{{ o.diagnosis or '—' }}</dd>
+          <dt>{{ _('Work done') }}</dt><dd style="white-space:pre-line">{{ o.work_done or '—' }}</dd>
+          {% if o.internal_notes %}<dt>{{ _('Internal notes') }}</dt><dd style="white-space:pre-line" class="muted">{{ o.internal_notes }}</dd>{% endif %}
+        </dl>
+      </div>
+    </div>
+
+    <form method="post" action="{{ url_for('orders.lines', oid=o.id) }}" class="card" id="lines">
+      {{ csrf() }}
+      <div class="card-head"><div><h2>{{ _('Parts & labour') }}</h2><div class="sub">{{ _('Used parts are deducted from stock when the invoice is issued.') }}</div></div>
+        {% if not locked %}<button class="btn btn-sm btn-primary">{{ icon('check') }} {{ _('Save') }}</button>{% endif %}</div>
+      {% if locked %}
+        <div class="table-wrap"><table class="table compact">
+          <thead><tr><th>{{ _('Description') }}</th><th class="num">{{ _('Qty') }}</th><th class="num">{{ _('Unit price') }}</th><th class="num">{{ _('VAT') }}</th><th class="num">{{ _('Total') }}</th></tr></thead>
+          <tbody>{% for l in o.lines %}{% set lc = totals.lines[loop.index0] %}
+            <tr><td>{{ l.description }}</td><td class="num">{{ l.qty|num(None) }} {{ _(UNITS.get(l.unit, l.unit)) }}</td><td class="num">{{ l.unit_price|money }}</td><td class="num">%{{ l.vat_rate }}</td><td class="num">{{ lc.total|money }}</td></tr>
+          {% endfor %}</tbody></table></div>
+      {% else %}
+        {{ line_editor(o.lines, products) }}
+      {% endif %}
+      <div class="lines-foot">
+        <div class="small muted" style="max-width:360px">{% if o.estimate %}{{ _('Estimate given to customer') }}: <b class="tnum">{{ o.estimate|money }}</b>{% endif %}</div>
+        {{ totals_box(totals) }}
+      </div>
+    </form>
+
+    <div class="card" id="activity">
+      <div class="card-head"><h2>{{ _('Activity') }}</h2></div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('orders.note', oid=o.id) }}" style="display:flex;gap:8px;margin-bottom:20px">
+          {{ csrf() }}
+          <input type="text" name="message" placeholder="{{ _('Add a note, e.g. “Called customer, will pick up Friday”') }}">
+          <button class="btn">{{ _('Add') }}</button>
+        </form>
+        <ul class="timeline">
+          {% for e in o.events %}
+          <li>
+            <span class="tl-dot {{ e.kind }}"></span>
+            {% if e.kind == 'status' %}
+              {% set parts = e.message.split('|', 1) %}
+              <div class="what">{{ _('Status changed to') }} {{ status_badge(parts[0]) }}</div>
+              {% if parts|length > 1 %}<div class="small">{{ parts[1] }}</div>{% endif %}
+            {% else %}
+              <div class="what">{{ e.message }}</div>
+            {% endif %}
+            <div class="when">{{ e.at|dt }}{% if e.user %} · {{ e.user.full_name or e.user.username }}{% endif %}</div>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <div class="card-head"><h2>{{ _('Customer') }}</h2><a class="btn btn-sm btn-ghost" href="{{ url_for('contacts.view', cid=o.contact.id) }}">{{ _('Open') }}</a></div>
+      <div class="card-body">
+        <div class="strong">{{ o.contact.name }}</div>
+        <div class="small muted" style="margin-top:4px">{{ o.contact.tax_id }}</div>
+        {% if o.contact.phone %}<div style="margin-top:10px">{{ icon('phone', 'sm') }} <a href="tel:{{ o.contact.phone }}">{{ o.contact.phone }}</a></div>{% endif %}
+        {% if o.contact.email %}<div style="margin-top:4px">{{ icon('mail', 'sm') }} <a href="mailto:{{ o.contact.email }}">{{ o.contact.email }}</a></div>{% endif %}
+      </div>
+    </div>
+
+    {% if o.status != 'delivered' and o.status != 'cancelled' %}
+    <form method="post" action="{{ url_for('orders.status', oid=o.id) }}" class="card">
+      {{ csrf() }}
+      <div class="card-head"><h2>{{ _('Update status') }}</h2></div>
+      <div class="card-body">
+        <div class="field"><select name="status">
+          {% for st in ['received', 'diagnosing', 'awaiting_approval', 'in_repair', 'awaiting_parts', 'ready', 'delivered', 'cancelled'] %}
+            <option value="{{ st }}" {{ 'selected' if o.status == st }}>{{ _(STATUS_LABELS[st]) }}</option>
+          {% endfor %}
+        </select></div>
+        <div class="field"><input type="text" name="note" placeholder="{{ _('Optional note') }}"></div>
+        <button class="btn btn-primary btn-block">{{ _('Update') }}</button>
+      </div>
+    </form>
+    {% endif %}
+
+    {% if o.status == 'awaiting_approval' %}
+    <div class="card">
+      <div class="card-head"><h2>{{ _('Customer approval') }}</h2></div>
+      <div class="card-body">
+        <p class="small muted">{{ _('Estimate') }}: <b class="tnum" style="color:var(--text)">{{ (o.estimate or totals.payable)|money }}</b></p>
+        <div style="display:flex;gap:8px">
+          <form method="post" action="{{ url_for('orders.approval', oid=o.id) }}" style="flex:1">{{ csrf() }}<input type="hidden" name="approved" value="1"><button class="btn btn-primary btn-block">{{ icon('check') }} {{ _('Approved') }}</button></form>
+          <form method="post" action="{{ url_for('orders.approval', oid=o.id) }}" style="flex:1">{{ csrf() }}<input type="hidden" name="approved" value="0"><button class="btn btn-danger btn-block">{{ icon('x') }} {{ _('Declined') }}</button></form>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <div class="card-head"><h2>{{ _('Summary') }}</h2></div>
+      <div class="card-body">
+        <dl class="dl" style="grid-template-columns: 120px 1fr">
+          <dt>{{ _('Technician') }}</dt><dd>{{ o.technician.full_name if o.technician else '—' }}</dd>
+          <dt>{{ _('Promised') }}</dt><dd>{{ o.promised_date|d or '—' }}{% if o.promised_date and o.is_open %} <span class="small muted">({{ o.promised_date|reldays }})</span>{% endif %}</dd>
+          {% if o.delivered_at %}<dt>{{ _('Delivered') }}</dt><dd>{{ o.delivered_at|dt }}</dd>{% endif %}
+          <dt>{{ _('Approval') }}</dt><dd>{% if o.customer_approved is none %}—{% elif o.customer_approved %}<span class="tag green">{{ _('Approved') }}</span>{% else %}<span class="tag red">{{ _('Declined') }}</span>{% endif %}</dd>
+          <dt>{{ _('Invoice') }}</dt><dd>{% if o.invoice %}<a href="{{ url_for('invoices.view', iid=o.invoice.id) }}">{{ o.invoice.number or _('Draft') }}</a> {{ status_badge(o.invoice.status) }}{% else %}—{% endif %}</dd>
+        </dl>
+      </div>
+      {% if not locked %}
+      <div class="card-foot">
+        <form method="post" action="{{ url_for('orders.delete', oid=o.id) }}" data-confirm="{{ _('Delete this service order?') }}">{{ csrf() }}
+          <button class="btn btn-sm btn-ghost btn-danger">{{ icon('trash') }} {{ _('Delete order') }}</button></form>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

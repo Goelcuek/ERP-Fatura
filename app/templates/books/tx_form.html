@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import contact_picker %}
+{% set titles = {'collection': _('Receive payment'), 'payment': _('Pay supplier'), 'income': _('Other income'), 'transfer': _('Transfer between accounts')} %}
+{% block title %}{{ titles[kind] }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('books.index') }}">{{ _('Cash & bank') }}</a>{{ icon('chevron-right', 'sm') }}<span>{{ titles[kind] }}</span></div>
+<div class="page-head"><div><h1>{{ titles[kind] }}</h1>
+  <div class="sub">{% if kind == 'collection' %}{{ _('Money received from a customer. It reduces their open balance.') }}{% elif kind == 'payment' %}{{ _('Money paid to a supplier or contact.') }}{% elif kind == 'income' %}{{ _('Income that is not from an invoice, e.g. interest or scrap sales.') }}{% else %}{{ _('Move money between your own accounts, e.g. depositing cash at the bank.') }}{% endif %}</div></div></div>
+<div class="tabs" style="max-width:720px">
+  {% for k in ['collection', 'payment', 'income', 'transfer'] %}<a href="{{ url_for('books.tx_new', kind=k, contact_id=contact.id if contact else None) }}" class="{{ 'active' if kind == k }}">{{ titles[k] }}</a>{% endfor %}
+</div>
+<form method="post" class="card" style="max-width:720px">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <input type="hidden" name="kind" value="{{ kind }}">
+  {% if contact %}<input type="hidden" name="return_to" value="contact">{% endif %}
+  <div class="card-body">
+    {% if kind in ['collection', 'payment', 'income'] %}
+    <div class="field"><label class="{{ 'req' if kind != 'income' }}">{{ _('Customer') if kind == 'collection' else (_('Supplier') if kind == 'payment' else _('Contact (optional)')) }}</label>{{ contact_picker(contact, required=(kind != 'income')) }}</div>
+    {% endif %}
+    <div class="form-row">
+      <div class="field"><label class="req">{{ _('Amount (₺)') }}</label><input type="text" inputmode="decimal" class="num" name="amount" required autofocus></div>
+      <div class="field"><label>{{ _('Date') }}</label><input type="date" name="date" value="{{ today.isoformat() }}"></div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label>{{ _('From account') if kind == 'transfer' else _('Account') }}</label>
+        <select name="account_id">{% for a in accounts %}<option value="{{ a.id }}">{{ a.name }}</option>{% endfor %}</select></div>
+      {% if kind == 'transfer' %}
+      <div class="field"><label>{{ _('To account') }}</label>
+        <select name="to_account_id">{% for a in accounts %}<option value="{{ a.id }}" {{ 'selected' if loop.index == 2 }}>{{ a.name }}</option>{% endfor %}</select></div>
+      {% else %}
+      <div class="field"><label>{{ _('Category') }}</label><input type="text" name="category" list="tx-cats" placeholder="{{ _('optional') }}"></div>
+      {% endif %}
+    </div>
+    <div class="field"><label>{{ _('Description') }}</label><input type="text" name="description" placeholder="{{ _('e.g. EFT, cheque no, receipt no') }}"></div>
+  </div>
+  <div class="form-actions"><a class="btn btn-ghost" href="{{ url_for('books.index') }}">{{ _('Cancel') }}</a><button class="btn btn-primary">{{ _('Save') }}</button></div>
+</form>
+<datalist id="tx-cats"><option value="Satış"><option value="Faiz geliri"><option value="Hurda satışı"><option value="Avans"></datalist>
+{% endblock %}

@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import csrf, totals_box %}
+{% block title %}{{ inv.number or _('Draft invoice') }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('invoices.index') }}">{{ _('Invoices') }}</a>{{ icon('chevron-right', 'sm') }}<span>{{ inv.number or _('Draft') }}</span></div>
+<div class="page-head">
+  <div>
+    <div class="title-row"><h1 class="{{ 'mono' if inv.number }}" style="font-size:22px">{{ inv.number or _('Draft invoice') }}</h1>{{ status_badge(inv.status) }}
+      {% if inv.is_overdue %}<span class="tag red">{{ _('Overdue') }}</span>{% endif %}</div>
+    <div class="sub">{{ _(PROFILE_LABELS[inv.profile]) }} · {{ _(TYPE_LABELS[inv.type_code]) }}{% if inv.type_code == 'TEVKIFAT' %} ({{ inv.withholding_code }}){% endif %} · {{ inv.issue_date|d }}</div>
+  </div>
+  <div class="actions">
+    <a class="btn" href="{{ url_for('invoices.print_view', iid=inv.id) }}" target="_blank">{{ icon('printer') }} {{ _('Print') }}</a>
+    <a class="btn" href="{{ url_for('invoices.xml', iid=inv.id) }}">{{ icon('code') }} {{ _('XML preview') if inv.is_draft else _('XML') }}</a>
+    {% if inv.is_draft %}
+      <a class="btn" href="{{ url_for('invoices.edit', iid=inv.id) }}">{{ icon('edit') }} {{ _('Edit') }}</a>
+      <form method="post" action="{{ url_for('invoices.issue', iid=inv.id) }}" class="inline">{{ csrf() }}<input type="hidden" name="send" value="1">
+        <button class="btn btn-primary">{{ icon('send') }} {{ _('Issue & send') }}</button></form>
+    {% elif inv.status == 'issued' or inv.status == 'error' %}
+      <form method="post" action="{{ url_for('invoices.send', iid=inv.id) }}" class="inline">{{ csrf() }}
+        <button class="btn btn-primary">{{ icon('send') }} {{ _('Send again') if inv.status == 'error' else _('Send') }}</button></form>
+    {% elif inv.status == 'sent' %}
+      <form method="post" action="{{ url_for('invoices.refresh', iid=inv.id) }}" class="inline">{{ csrf() }}
+        <button class="btn btn-primary">{{ icon('refresh') }} {{ _('Check status') }}</button></form>
+    {% endif %}
+    <details class="menu">
+      <summary class="btn" aria-label="{{ _('More') }}">{{ icon('more') }}</summary>
+      <div class="menu-panel">
+        {% if inv.is_draft %}
+          <form method="post" action="{{ url_for('invoices.issue', iid=inv.id) }}">{{ csrf() }}<button>{{ icon('check', 'sm') }} {{ _('Issue without sending') }}</button></form>
+          <hr>
+          <form method="post" action="{{ url_for('invoices.cancel', iid=inv.id) }}" data-confirm="{{ _('Delete this draft?') }}">{{ csrf() }}<button class="danger">{{ icon('trash', 'sm') }} {{ _('Delete draft') }}</button></form>
+        {% else %}
+          {% if inv.status == 'error' %}
+            <form method="post" action="{{ url_for('invoices.rebuild', iid=inv.id) }}">{{ csrf() }}<button>{{ icon('refresh', 'sm') }} {{ _('Rebuild XML from current data') }}</button></form>
+          {% endif %}
+          {% if inv.status in ['exported', 'sent', 'error'] %}
+            {% for st in {'exported': ['sent', 'accepted', 'rejected'], 'sent': ['accepted', 'rejected'], 'error': ['sent']}[inv.status] %}
+            <form method="post" action="{{ url_for('invoices.mark', iid=inv.id) }}">{{ csrf() }}<input type="hidden" name="status" value="{{ st }}"><button>{{ icon('check', 'sm') }} {{ _('Mark as') }} “{{ _(STATUS_LABELS[st]) }}”</button></form>
+            {% endfor %}
+          {% endif %}
+          {% if inv.status in ['sent', 'accepted', 'exported', 'issued'] and inv.type_code != 'IADE' %}
+            <form method="post" action="{{ url_for('invoices.make_return', iid=inv.id) }}">{{ csrf() }}<button>{{ icon('undo', 'sm') }} {{ _('Create return invoice') }}</button></form>
+          {% endif %}
+          {% if inv.status != 'cancelled' %}
+            <hr>
+            <form method="post" action="{{ url_for('invoices.cancel', iid=inv.id) }}" data-confirm="{{ _('Cancel this invoice? For e-Fatura, the receiver must also be informed; usually a return invoice is the right tool.') }}">{{ csrf() }}<button class="danger">{{ icon('x', 'sm') }} {{ _('Cancel invoice') }}</button></form>
+          {% endif %}
+        {% endif %}
+      </div>
+    </details>
+  </div>
+</div>
+
+{% if inv.status == 'error' and inv.status_message %}
+<div class="alert alert-error" style="margin-bottom:16px">{{ icon('alert') }}<div class="body"><b>{{ _('The integrator returned an error') }}</b><p>{{ inv.status_message }}</p><p>{{ _('Fix the customer or company data, then use “Rebuild XML” and send again.') }}</p></div></div>
+{% elif inv.status == 'exported' %}
+<div class="alert alert-info" style="margin-bottom:16px">{{ icon('info') }}<div class="body"><b>{{ _('XML exported for manual upload') }}</b><p>{{ _('Upload the XML file in your integrator’s portal, then mark the invoice as sent.') }}</p></div></div>
+{% elif inv.is_draft %}
+<div class="alert alert-warning" style="margin-bottom:16px">{{ icon('info') }}<div class="body"><b>{{ _('This invoice is a draft.') }}</b><p>{{ _('It has no legal effect until it is issued and sent to GİB through your integrator.') }}</p></div></div>
+{% endif %}
+
+<div class="split">
+  <div class="card">
+    <div class="card-body" style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+      <div>
+        <div class="label muted small">{{ _('Bill to') }}</div>
+        <div class="strong" style="font-size:15px"><a href="{{ url_for('contacts.view', cid=inv.contact.id) }}" style="color:inherit">{{ inv.contact.name }}</a></div>
+        <div class="small muted" style="margin-top:4px">{{ inv.contact.display_address }}</div>
+        <div class="small muted">{{ inv.contact.id_scheme }}: {{ inv.contact.tax_id or '—' }}{% if inv.contact.tax_office %} · {{ inv.contact.tax_office }}{% endif %}</div>
+      </div>
+      <div class="kv-inline" style="justify-content:flex-end;align-content:flex-start">
+        <div><span>{{ _('Issue date') }}</span><b>{{ inv.issue_date|d }}</b></div>
+        <div><span>{{ _('Due date') }}</span><b>{{ inv.due_date|d or '—' }}</b></div>
+        <div><span>{{ _('Amount due') }}</span><b>{{ inv.payable|money }}</b></div>
+      </div>
+    </div>
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th>#</th><th>{{ _('Description') }}</th><th class="num">{{ _('Qty') }}</th><th class="num">{{ _('Unit price') }}</th><th class="num">{{ _('Disc.') }}</th><th class="num">{{ _('VAT') }}</th><th class="num">{{ _('Net') }}</th></tr></thead>
+      <tbody>{% for l in inv.lines %}{% set lc = totals.lines[loop.index0] %}
+        <tr><td class="muted">{{ loop.index }}</td><td class="primary">{{ l.description }}{% if l.product and l.product.code %}<div class="secondary">{{ l.product.code }}</div>{% endif %}</td>
+          <td class="num">{{ l.qty|num(None) }} <span class="muted">{{ _(UNITS.get(l.unit, l.unit)) }}</span></td>
+          <td class="num">{{ l.unit_price|money }}</td><td class="num muted">{{ ('%' ~ (l.discount_rate|num(None))) if l.discount_rate else '—' }}</td>
+          <td class="num muted">%{{ l.vat_rate }}</td><td class="num">{{ lc.net|money }}</td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+    <div class="lines-foot">
+      <div class="small muted" style="max-width:380px;white-space:pre-line">{{ inv.notes }}</div>
+      {{ totals_box(totals) }}
+    </div>
+  </div>
+
+  <div class="stack">
+    {% if inv.status in ['issued', 'sent', 'accepted', 'exported'] %}
+    {% set paid = inv.paid_amount %}
+    <div class="card">
+      <div class="card-head"><h2>{{ _('Payment') }}</h2>
+        {% if inv.open_amount == 0 %}<span class="badge badge-success"><span class="dot"></span>{{ _('Paid') }}</span>{% elif paid > 0 %}<span class="badge badge-warning"><span class="dot"></span>{{ _('Partly paid') }}</span>{% else %}<span class="badge badge-neutral"><span class="dot"></span>{{ _('Unpaid') }}</span>{% endif %}</div>
+      <div class="card-body">
+        <div class="progress" style="margin-bottom:10px"><span style="width:{{ ((paid / inv.payable * 100) if inv.payable else 0)|round(0)|int }}%"></span></div>
+        <div class="kv-inline"><div><span>{{ _('Paid') }}</span><b>{{ paid|money }}</b></div><div><span>{{ _('Open') }}</span><b>{{ inv.open_amount|money }}</b></div></div>
+        {% for t in inv.payments %}<div class="small muted" style="margin-top:8px">{{ icon('check', 'sm') }} {{ t.date|d }} · {{ t.account.name }} · <span class="tnum">{{ t.amount|money }}</span></div>{% endfor %}
+      </div>
+      {% if inv.open_amount > 0 and accounts %}
+      <form method="post" action="{{ url_for('invoices.pay', iid=inv.id) }}" class="card-foot" style="display:grid;gap:8px">
+        {{ csrf() }}
+        <div class="form-row" style="gap:8px">
+          <input type="text" name="amount" inputmode="decimal" class="num" value="{{ inv.open_amount|inp }}" aria-label="{{ _('Amount') }}">
+          <input type="date" name="date" value="{{ today().isoformat() }}" aria-label="{{ _('Date') }}">
+        </div>
+        <select name="account_id">{% for a in accounts %}<option value="{{ a.id }}">{{ a.name }}</option>{% endfor %}</select>
+        <button class="btn btn-primary">{{ icon('in') }} {{ _('Record refund') if inv.type_code == 'IADE' else _('Record payment') }}</button>
+      </form>
+      {% elif inv.open_amount > 0 %}
+      <div class="card-foot small"><a href="{{ url_for('books.account_form') }}">{{ _('Create a cash or bank account') }}</a> {{ _('to record payments.') }}</div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <div class="card-head"><h2>{{ _('e-Invoice details') }}</h2></div>
+      <div class="card-body">
+        <dl class="dl" style="grid-template-columns: 110px 1fr">
+          <dt>ETTN</dt><dd class="mono small">{{ inv.uuid|upper }}</dd>
+          <dt>{{ _('Receiver alias') }}</dt><dd class="mono small">{{ inv.contact.efatura_alias or '—' }}</dd>
+          <dt>{{ _('Integrator') }}</dt><dd>{{ inv.integrator or '—' }}</dd>
+          <dt>{{ _('Reference') }}</dt><dd class="mono small">{{ inv.integrator_ref or '—' }}</dd>
+          <dt>{{ _('Sent at') }}</dt><dd>{{ inv.sent_at|dt or '—' }}</dd>
+          {% if inv.return_ref_number %}<dt>{{ _('Returned invoice') }}</dt><dd class="mono small">{{ inv.return_ref_number }}</dd>{% endif %}
+          {% for o in inv.service_orders %}<dt>{{ _('Service order') }}</dt><dd><a href="{{ url_for('orders.view', oid=o.id) }}">{{ o.number }}</a></dd>{% endfor %}
+        </dl>
+      </div>
+    </div>
+
+    {% if inv.events %}
+    <div class="card">
+      <div class="card-head"><h2>{{ _('History') }}</h2></div>
+      <div class="card-body">
+        <ul class="timeline">{% for e in inv.events %}
+          <li><span class="tl-dot {{ e.kind }}"></span><div class="what small">{{ e.message }}</div><div class="when">{{ e.at|dt }}</div></li>
+        {% endfor %}</ul>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

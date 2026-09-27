@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+# runtime data: database, invoices, backups, secret key — never commit
+data/
+*.db
+*.db-wal
+*.db-shm

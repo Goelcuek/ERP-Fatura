@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}{{ a.name or _('New account') }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('books.index') }}">{{ _('Cash & bank') }}</a>{{ icon('chevron-right', 'sm') }}<span>{{ a.name or _('New account') }}</span></div>
+<div class="page-head"><div><h1>{{ a.name or _('New account') }}</h1></div></div>
+<form method="post" class="card" style="max-width:720px">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <div class="card-body">
+    <div class="field"><label>{{ _('Type') }}</label><div class="segmented">
+      {% for k, label, ic in [('cash', _('Cash box'), 'cash'), ('bank', _('Bank account'), 'bank'), ('pos', _('POS / card'), 'card')] %}
+      <label><input type="radio" name="kind" value="{{ k }}" {{ 'checked' if a.kind == k }}><span>{{ icon(ic, 'sm') }} {{ label }}</span></label>{% endfor %}
+    </div></div>
+    <div class="field"><label class="req">{{ _('Name') }}</label><input type="text" name="name" value="{{ a.name or '' }}" required placeholder="{{ _('e.g. Main cash box, Ziraat TL') }}"></div>
+    <div class="form-row">
+      <div class="field"><label>{{ _('IBAN') }}</label><input type="text" name="iban" value="{{ a.iban or '' }}" class="mono"></div>
+      <div class="field"><label>{{ _('Opening balance (₺)') }}</label><input type="text" inputmode="decimal" class="num" name="opening_balance" value="{{ a.opening_balance|inp if a.opening_balance is not none else '0.00' }}"></div>
+    </div>
+    {% if a.id %}<label class="check"><input type="checkbox" name="archived" value="1" {{ 'checked' if a.archived }}><span>{{ _('Archived (hidden from lists)') }}</span></label>{% endif %}
+  </div>
+  <div class="form-actions"><a class="btn btn-ghost" href="{{ url_for('books.index') }}">{{ _('Cancel') }}</a><button class="btn btn-primary">{{ _('Save') }}</button></div>
+</form>
+{% endblock %}

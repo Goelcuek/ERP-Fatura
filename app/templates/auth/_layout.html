@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="{{ current_lang() }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% endblock %} · Atölye</title>
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <script>try { var t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body>
+{% include "partials/icons.html" %}
+<div class="auth">
+  <section class="auth-side">
+    <div class="brand" style="padding:0">
+      <span class="brand-mark">{{ icon('wrench') }}</span>
+      <span class="brand-name">Atölye</span>
+    </div>
+    <div>
+      <h2>{{ _('Repair orders, e-invoices and bookkeeping in one calm place.') }}</h2>
+      <p>{{ _('Built for tool repair workshops: track every device from intake to delivery and invoice it with one click.') }}</p>
+      <ul class="auth-points">
+        <li>{{ icon('check-circle') }} {{ _('e-Fatura & e-Arşiv through your integrator') }}</li>
+        <li>{{ icon('check-circle') }} {{ _('Customer accounts, cash and bank') }}</li>
+        <li>{{ icon('check-circle') }} {{ _('Automatic backups you can restore in one step') }}</li>
+      </ul>
+    </div>
+    <div class="small" style="color:#667085">© {{ today().year }} Atölye</div>
+  </section>
+  <main class="auth-main">
+    {% block content %}{% endblock %}
+  </main>
+</div>
+<div class="toasts">
+  {% for cat, msg in get_flashed_messages(with_categories=true) %}
+    <div class="toast {{ cat }}">{{ icon('alert' if cat == 'error' else 'info') }}<div class="msg">{{ msg }}</div></div>
+  {% endfor %}
+</div>
+</body>
+</html>

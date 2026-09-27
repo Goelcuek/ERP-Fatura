@@ -1,0 +1,25 @@
+{% from "partials/macros.html" import csrf %}
+{% for t in txs %}
+{% set bal = balances_row[loop.index0] if balances_row else None %}
+<tr>
+  <td class="nowrap">{{ t.date|d }}</td>
+  <td>
+    <div style="display:flex;gap:10px;align-items:center">
+      <span class="icon-tile {{ 'green' if t.direction == 'in' else 'amber' }}" style="width:28px;height:28px;border-radius:7px">{{ icon('transfer' if t.kind == 'transfer' else ('in' if t.direction == 'in' else 'out'), 'sm') }}</span>
+      <div style="min-width:0">
+        <div class="primary ellipsis">{% if t.contact %}<a href="{{ url_for('contacts.view', cid=t.contact.id, tab='ledger') }}" style="color:inherit">{{ t.contact.name }}</a>{% else %}{{ t.description or t.category or _(KIND_LABELS[t.kind]) }}{% endif %}</div>
+        <div class="secondary ellipsis">{{ _(KIND_LABELS[t.kind]) }}{% if t.category %} · {{ t.category }}{% endif %}{% if t.contact and t.description %} · {{ t.description }}{% endif %}{% if t.invoice %} · <a href="{{ url_for('invoices.view', iid=t.invoice.id) }}">{{ t.invoice.number }}</a>{% endif %}</div>
+      </div>
+    </div>
+  </td>
+  {% if show_account %}<td class="muted">{{ t.account.name }}</td>{% endif %}
+  <td class="num {{ 'pos' if t.direction == 'in' else '' }}">{{ ('+' if t.direction == 'in' else '−') }}{{ t.amount|money }}</td>
+  {% if bal is not none %}<td class="num muted">{{ bal|money }}</td>{% endif %}
+  <td class="actions">
+    {% if not t.expense_id %}
+    <form method="post" action="{{ url_for('books.tx_delete', tid=t.id) }}" class="inline" data-confirm="{{ _('Delete this transaction?') }}">{{ csrf() }}
+      <button class="icon-btn row-del" title="{{ _('Delete') }}" style="color:var(--faint)">{{ icon('trash', 'sm') }}</button></form>
+    {% endif %}
+  </td>
+</tr>
+{% endfor %}

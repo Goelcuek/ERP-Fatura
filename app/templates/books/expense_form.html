@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import contact_picker %}
+{% block title %}{{ _('Expense') }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('books.expenses') }}">{{ _('Expenses') }}</a>{{ icon('chevron-right', 'sm') }}<span>{{ _('Edit') if e.id else _('New') }}</span></div>
+<div class="page-head"><div><h1>{{ _('Edit expense') if e.id else _('New expense') }}</h1><div class="sub">{{ _('Enter a purchase invoice, receipt or bill.') }}</div></div></div>
+<form method="post" class="card" style="max-width:820px">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <div class="card-body">
+    <div class="field"><label>{{ _('Supplier (optional)') }}</label>{{ contact_picker(e.contact, required=False, placeholder=_('Search supplier…')) }}</div>
+    <div class="form-row three">
+      <div class="field"><label>{{ _('Date') }}</label><input type="date" name="date" value="{{ e.date.isoformat() }}"></div>
+      <div class="field"><label>{{ _('Document no') }}</label><input type="text" name="doc_no" value="{{ e.doc_no or '' }}"></div>
+      <div class="field"><label>{{ _('Category') }}</label><select name="category">{% for c in categories %}<option {{ 'selected' if c == e.category }}>{{ c }}</option>{% endfor %}</select></div>
+    </div>
+    <div class="field"><label>{{ _('Description') }}</label><input type="text" name="description" value="{{ e.description or '' }}"></div>
+    <div class="form-row three">
+      <div class="field"><label>{{ _('Amount (₺)') }}</label><input type="text" inputmode="decimal" class="num" name="amount" value="{{ e.net|inp if e.id else '' }}" required></div>
+      <div class="field"><label>{{ _('Amount is') }}</label><div class="segmented">
+        <label><input type="radio" name="amount_mode" value="net" checked><span>{{ _('excl. VAT') }}</span></label>
+        <label><input type="radio" name="amount_mode" value="gross"><span>{{ _('incl. VAT') }}</span></label></div></div>
+      <div class="field"><label>{{ _('VAT') }}</label><select name="vat_rate">{% for r in vat_rates %}<option value="{{ r }}" {{ 'selected' if e.vat_rate == r }}>%{{ r }}</option>{% endfor %}</select></div>
+    </div>
+    {% if e.id %}
+      <div class="kv-inline" style="margin-bottom:16px"><div><span>{{ _('Net') }}</span><b>{{ e.net|money }}</b></div><div><span>{{ _('VAT') }}</span><b>{{ e.vat|money }}</b></div><div><span>{{ _('Total') }}</span><b>{{ e.total|money }}</b></div><div><span>{{ _('Paid') }}</span><b>{{ e.paid_amount|money }}</b></div></div>
+    {% endif %}
+    {% if not e.payments %}
+    <div class="field" style="margin-bottom:0"><label>{{ _('Paid from') }}</label>
+      <select name="pay_account_id"><option value="">{{ _('Not paid yet (on supplier account)') }}</option>{% for a in accounts %}<option value="{{ a.id }}" {{ 'selected' if not e.id and loop.first and not e.contact }}>{{ a.name }}</option>{% endfor %}</select>
+      <div class="hint">{{ _('Choosing an account records the payment immediately.') }}</div></div>
+    {% endif %}
+  </div>
+  <div class="form-actions"><a class="btn btn-ghost" href="{{ url_for('books.expenses') }}">{{ _('Cancel') }}</a><button class="btn btn-primary">{{ _('Save expense') }}</button></div>
+</form>
+{% endblock %}

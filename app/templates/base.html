@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="{{ current_lang() }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% endblock %}{% if self.title() %} · {% endif %}{{ company_name }}</title>
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <script>
+    try { var t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+</head>
+<body>
+{% include "partials/icons.html" %}
+{% set ep = request.endpoint or "" %}
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <a class="brand" href="{{ url_for('dashboard.index') }}">
+      <span class="brand-mark">{{ icon('wrench') }}</span>
+      <span>
+        <div class="brand-name">Atölye</div>
+        <div class="brand-sub ellipsis">{{ company_name }}</div>
+      </span>
+    </a>
+    <nav class="nav">
+      <a href="{{ url_for('dashboard.index') }}" class="{{ 'active' if ep == 'dashboard.index' }}">{{ icon('home') }} {{ _('Dashboard') }}</a>
+      <div class="nav-label">{{ _('Workshop') }}</div>
+      <a href="{{ url_for('orders.index') }}" class="{{ 'active' if ep.startswith('orders.') }}">{{ icon('wrench') }} {{ _('Service orders') }}</a>
+      <a href="{{ url_for('contacts.index') }}" class="{{ 'active' if ep.startswith('contacts.') }}">{{ icon('users') }} {{ _('Customers') }}</a>
+      <a href="{{ url_for('products.index') }}" class="{{ 'active' if ep.startswith('products.') }}">{{ icon('package') }} {{ _('Parts & services') }}</a>
+      <div class="nav-label">{{ _('Finance') }}</div>
+      <a href="{{ url_for('invoices.index') }}" class="{{ 'active' if ep.startswith('invoices.') }}">{{ icon('file') }} {{ _('Invoices') }}</a>
+      <a href="{{ url_for('books.index') }}" class="{{ 'active' if ep.startswith('books.') and 'expense' not in ep }}">{{ icon('wallet') }} {{ _('Cash & bank') }}</a>
+      <a href="{{ url_for('books.expenses') }}" class="{{ 'active' if 'expense' in ep }}">{{ icon('receipt') }} {{ _('Expenses') }}</a>
+      <a href="{{ url_for('reports.index') }}" class="{{ 'active' if ep.startswith('reports.') }}">{{ icon('chart') }} {{ _('Reports') }}</a>
+      {% if g.user.is_admin %}
+      <div class="nav-label">{{ _('System') }}</div>
+      <a href="{{ url_for('settings.company') }}" class="{{ 'active' if ep.startswith('settings.') and not ep.startswith('settings.backup') }}">{{ icon('settings') }} {{ _('Settings') }}</a>
+      <a href="{{ url_for('settings.backup') }}" class="{{ 'active' if ep.startswith('settings.backup') }}">{{ icon('database') }} {{ _('Backups') }}</a>
+      {% endif %}
+    </nav>
+    <div class="sidebar-foot">
+      <div class="user-chip">
+        <a href="{{ url_for('auth.profile') }}" style="display:flex;gap:10px;align-items:center;color:inherit;min-width:0">
+          <span class="avatar">{{ g.user.initials }}</span>
+          <span class="who ellipsis"><b class="ellipsis">{{ g.user.full_name or g.user.username }}</b><span>{{ _('Administrator') if g.user.is_admin else _('Staff') }}</span></span>
+        </a>
+        <span class="foot-actions">
+          <button class="icon-btn" type="button" data-theme-toggle title="{{ _('Toggle dark mode') }}">{{ icon('moon', 'sm') }}</button>
+          <form method="post" action="{{ url_for('auth.logout') }}" class="inline">
+            <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+            <button class="icon-btn" title="{{ _('Log out') }}">{{ icon('logout', 'sm') }}</button>
+          </form>
+        </span>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn menu-toggle" type="button" data-nav-toggle aria-label="Menu">{{ icon('menu') }}</button>
+      <form class="search" action="{{ url_for('dashboard.search') }}">
+        {{ icon('search', 'sm') }}
+        <input type="search" name="q" id="global-search" placeholder="{{ _('Search customers, service orders, invoices…') }}" value="{{ request.args.get('q', '') if ep == 'dashboard.search' }}" autocomplete="off">
+        <kbd>/</kbd>
+      </form>
+      <div class="spacer"></div>
+      <a class="btn btn-sm" href="{{ url_for('invoices.new') }}">{{ icon('file') }} <span class="hide-sm">{{ _('New invoice') }}</span></a>
+      <a class="btn btn-sm btn-primary" href="{{ url_for('orders.new') }}">{{ icon('plus') }} <span class="hide-sm">{{ _('New service order') }}</span></a>
+    </header>
+
+    <main class="content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+
+<div class="toasts" id="toasts">
+  {% for cat, msg in get_flashed_messages(with_categories=true) %}
+    <div class="toast {{ cat }}" role="status">
+      {{ icon('check-circle' if cat == 'success' else ('alert' if cat == 'error' else 'info')) }}
+      <div class="msg">{{ msg }}</div>
+      <button type="button" data-dismiss aria-label="Close">{{ icon('x', 'sm') }}</button>
+    </div>
+  {% endfor %}
+</div>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import empty %}
+{% block title %}{{ a.name }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('books.index') }}">{{ _('Cash & bank') }}</a>{{ icon('chevron-right', 'sm') }}<span>{{ a.name }}</span></div>
+<div class="page-head">
+  <div><h1>{{ a.name }}</h1><div class="sub">{{ _('Balance') }}: <b class="tnum" style="color:var(--text)">{{ balance|money }}</b>{% if a.iban %} · <span class="mono">{{ a.iban }}</span>{% endif %}</div></div>
+  <div class="actions"><a class="btn" href="{{ url_for('books.account_form', aid=a.id) }}">{{ icon('edit') }} {{ _('Edit') }}</a></div>
+</div>
+<div class="card">
+  <form class="toolbar">
+    <label class="small muted" style="margin:0">{{ _('From') }}</label><input type="date" name="from" value="{{ dfrom.isoformat() if dfrom else '' }}" style="width:auto">
+    <label class="small muted" style="margin:0">{{ _('To') }}</label><input type="date" name="to" value="{{ dto.isoformat() if dto else '' }}" style="width:auto">
+    <button class="btn btn-sm">{{ _('Filter') }}</button>
+    <span class="grow"></span><span class="small muted">{{ _('Opening balance') }}: {{ a.opening_balance|money }}</span>
+  </form>
+  {% if rows %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>{{ _('Date') }}</th><th>{{ _('Description') }}</th><th class="num">{{ _('Amount') }}</th><th class="num">{{ _('Balance') }}</th><th></th></tr></thead>
+    <tbody>{% with txs=rows|map(attribute=0)|list, balances_row=rows|map(attribute=1)|list, show_account=False %}{% include "books/_tx_rows.html" %}{% endwith %}</tbody>
+  </table></div>
+  {% else %}{{ empty('wallet', _('No transactions in this period')) }}{% endif %}
+</div>
+{% endblock %}

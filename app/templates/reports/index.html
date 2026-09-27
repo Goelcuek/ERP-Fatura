@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import month_chart %}
+{% block title %}{{ _('Reports') }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ _('Reports') }}</h1><div class="sub">{{ _('Profit, VAT and cash flow per month. Amounts are net of VAT unless stated.') }}</div></div>
+  <div class="actions">
+    <form style="display:flex;gap:8px"><select name="year" onchange="this.form.submit()" style="width:auto">{% for y in years %}<option {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}</select></form>
+    <a class="btn" href="{{ url_for('reports.receivables') }}">{{ icon('users') }} {{ _('Customer balances') }}</a>
+    <details class="menu">
+      <summary class="btn">{{ icon('download') }} {{ _('For your accountant') }} {{ icon('chevron-down', 'sm') }}</summary>
+      <div class="menu-panel">
+        {% set rng = {'from': year ~ '-01-01', 'to': year ~ '-12-31'} %}
+        <a href="{{ url_for('reports.export', what='invoices', **rng) }}">{{ icon('file', 'sm') }} {{ _('Invoices') }} {{ year }} (CSV)</a>
+        <a href="{{ url_for('reports.export', what='invoice-lines', **rng) }}">{{ icon('file', 'sm') }} {{ _('Invoice lines') }} {{ year }} (CSV)</a>
+        <a href="{{ url_for('reports.export', what='expenses', **rng) }}">{{ icon('receipt', 'sm') }} {{ _('Expenses') }} {{ year }} (CSV)</a>
+        <a href="{{ url_for('reports.export', what='transactions', **rng) }}">{{ icon('wallet', 'sm') }} {{ _('Cash & bank') }} {{ year }} (CSV)</a>
+        <a href="{{ url_for('reports.export', what='contacts') }}">{{ icon('users', 'sm') }} {{ _('Contacts with balances') }} (CSV)</a>
+      </div>
+    </details>
+  </div>
+</div>
+
+<div class="grid grid-4">
+  <div class="card stat"><div class="label">{{ _('Net sales') }}</div><div class="value">{{ total.net_sales|money }}</div><div class="meta">{{ _('Returns') }}: {{ total.returns|money }}</div></div>
+  <div class="card stat"><div class="label">{{ _('Expenses') }}</div><div class="value">{{ total.expenses|money }}</div><div class="meta">{{ _('Deductible VAT') }}: {{ total.expense_vat|money }}</div></div>
+  <div class="card stat"><div class="label">{{ _('Profit (before tax)') }}</div><div class="value {{ 'neg' if total.profit < 0 }}">{{ total.profit|money }}</div><div class="meta">{{ _('Net sales − expenses') }}</div></div>
+  <div class="card stat"><div class="label">{{ _('VAT payable (estimate)') }}</div><div class="value">{{ total.vat_due|money }}</div><div class="meta">{{ _('Sales VAT − withheld − deductible') }}</div></div>
+</div>
+
+<div class="card" style="margin-top:16px" data-label-a="{{ _('Sales') }}" data-label-b="{{ _('Expenses') }}">
+  <div class="card-head"><div><h2>{{ _('Sales and expenses') }} · {{ year }}</h2></div>
+    <div class="legend"><span><i style="background:var(--series-1)"></i>{{ _('Sales') }}</span><span><i style="background:var(--series-2)"></i>{{ _('Expenses') }}</span></div></div>
+  <div class="card-body">{{ month_chart(series, 220) }}</div>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <div class="card-head"><div><h2>{{ _('Monthly breakdown') }}</h2><div class="sub">{{ _('The VAT figure is an estimate to help planning; your accountant files the official return.') }}</div></div></div>
+  <div class="table-wrap"><table class="table compact">
+    <thead><tr><th>{{ _('Month') }}</th><th class="num">{{ _('Net sales') }}</th><th class="num">{{ _('Sales VAT') }}</th><th class="num">{{ _('Withheld') }}</th><th class="num">{{ _('Expenses') }}</th><th class="num">{{ _('Deductible VAT') }}</th><th class="num">{{ _('VAT payable') }}</th><th class="num">{{ _('Profit') }}</th><th class="num">{{ _('Money in') }}</th><th class="num">{{ _('Money out') }}</th></tr></thead>
+    <tbody>{% for r in rows %}
+      <tr><td class="strong">{{ r.label }}</td>
+        <td class="num">{{ r.net_sales|money(blank_zero=True) }}</td><td class="num muted">{{ r.sales_vat|money(blank_zero=True) }}</td>
+        <td class="num muted">{{ r.withheld|money(blank_zero=True) }}</td>
+        <td class="num">{{ r.expenses|money(blank_zero=True) }}</td><td class="num muted">{{ r.expense_vat|money(blank_zero=True) }}</td>
+        <td class="num">{{ r.vat_due|money(blank_zero=True) }}</td>
+        <td class="num strong {{ 'neg' if r.profit < 0 }}">{{ r.profit|money(blank_zero=True) }}</td>
+        <td class="num pos">{{ r.collected|money(blank_zero=True) }}</td><td class="num">{{ r.paid|money(blank_zero=True) }}</td></tr>
+    {% endfor %}</tbody>
+    <tfoot><tr><td>{{ _('Total') }}</td><td class="num">{{ total.net_sales|money }}</td><td class="num">{{ total.sales_vat|money }}</td><td class="num">{{ total.withheld|money }}</td><td class="num">{{ total.expenses|money }}</td><td class="num">{{ total.expense_vat|money }}</td><td class="num">{{ total.vat_due|money }}</td><td class="num">{{ total.profit|money }}</td><td class="num">{{ total.collected|money }}</td><td class="num">{{ total.paid|money }}</td></tr></tfoot>
+  </table></div>
+</div>
+{% endblock %}

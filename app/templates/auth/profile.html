@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{{ _('My profile') }}{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>{{ _('My profile') }}</h1><div class="sub">{{ g.user.username }}</div></div></div>
+<form method="post" class="card" style="max-width:760px">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <div class="form-section">
+    <div class="intro"><h3>{{ _('Personal') }}</h3><p>{{ _('Your name and interface language.') }}</p></div>
+    <div>
+      <div class="field"><label>{{ _('Full name') }}</label><input type="text" name="full_name" value="{{ g.user.full_name }}"></div>
+      <div class="field"><label>{{ _('Language') }}</label>
+        <div class="segmented">{% for code, name in LANGUAGES.items() %}<label><input type="radio" name="lang" value="{{ code }}" {{ 'checked' if g.user.lang == code }}><span>{{ name }}</span></label>{% endfor %}</div>
+      </div>
+    </div>
+  </div>
+  <div class="form-section">
+    <div class="intro"><h3>{{ _('Password') }}</h3><p>{{ _('Leave empty to keep your current password.') }}</p></div>
+    <div class="form-row">
+      <div class="field"><label>{{ _('Current password') }}</label><input type="password" name="current_password" autocomplete="current-password"></div>
+      <div class="field"><label>{{ _('New password') }}</label><input type="password" name="new_password" minlength="8" autocomplete="new-password"></div>
+    </div>
+  </div>
+  <div class="form-actions"><button class="btn btn-primary">{{ _('Save') }}</button></div>
+</form>
+{% endblock %}

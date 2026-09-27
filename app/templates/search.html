@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import empty %}
+{% block title %}{{ _('Search') }}{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>{{ _('Search') }}</h1><div class="sub">{% if q %}{{ _('Results for “{q}”', q=q) }}{% else %}{{ _('Type in the search box above.') }}{% endif %}</div></div></div>
+{% if q and not (contacts or orders or invoices) %}
+  <div class="card">{{ empty('search', _('Nothing found'), _('Try a name, tax number, serial number or invoice number.')) }}</div>
+{% endif %}
+<div class="stack">
+{% if contacts %}
+<div class="card">
+  <div class="card-head"><h2>{{ _('Customers') }}</h2><span class="muted small">{{ contacts|length }}</span></div>
+  <ul class="list">{% for c in contacts %}
+    <li><span class="avatar" style="background:var(--surface-3);color:var(--text-2)">{{ icon('building' if c.is_company else 'user', 'sm') }}</span>
+      <div class="grow"><a class="title" href="{{ url_for('contacts.view', cid=c.id) }}">{{ c.name }}</a><div class="small muted">{{ c.tax_id }} {{ c.phone }}</div></div></li>
+  {% endfor %}</ul>
+</div>
+{% endif %}
+{% if orders %}
+<div class="card">
+  <div class="card-head"><h2>{{ _('Service orders') }}</h2><span class="muted small">{{ orders|length }}</span></div>
+  <div class="table-wrap"><table class="table"><tbody>{% for o in orders %}
+    <tr class="clickable" data-href="{{ url_for('orders.view', oid=o.id) }}"><td><a class="primary" href="{{ url_for('orders.view', oid=o.id) }}">{{ o.number }}</a></td><td>{{ o.device_label }}<div class="secondary">S/N {{ o.serial_no or '—' }}</div></td><td>{{ o.contact.name }}</td><td>{{ status_badge(o.status) }}</td><td class="num muted">{{ o.received_at|d }}</td></tr>
+  {% endfor %}</tbody></table></div>
+</div>
+{% endif %}
+{% if invoices %}
+<div class="card">
+  <div class="card-head"><h2>{{ _('Invoices') }}</h2><span class="muted small">{{ invoices|length }}</span></div>
+  <div class="table-wrap"><table class="table"><tbody>{% for i in invoices %}
+    <tr class="clickable" data-href="{{ url_for('invoices.view', iid=i.id) }}"><td><a class="primary" href="{{ url_for('invoices.view', iid=i.id) }}">{{ i.number or _('Draft') }}</a></td><td>{{ i.contact.name }}</td><td>{{ status_badge(i.status) }}</td><td class="num">{{ i.payable|money }}</td><td class="num muted">{{ i.issue_date|d }}</td></tr>
+  {% endfor %}</tbody></table></div>
+</div>
+{% endif %}
+</div>
+{% endblock %}

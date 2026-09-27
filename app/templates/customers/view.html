@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import csrf, post_button, empty %}
+{% block title %}{{ c.name }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('contacts.index') }}">{{ _('Customers') }}</a>{{ icon('chevron-right', 'sm') }}<span class="ellipsis">{{ c.name }}</span></div>
+<div class="page-head">
+  <div>
+    <div class="title-row">
+      <h1>{{ c.name }}</h1>
+      {% if c.efatura_user %}<span class="tag blue">e-Fatura</span>{% else %}<span class="tag">e-Arşiv</span>{% endif %}
+      {% if c.withholding_buyer %}<span class="tag amber">{{ _('Withholding') }}</span>{% endif %}
+      {% if c.archived %}<span class="tag red">{{ _('Archived') }}</span>{% endif %}
+    </div>
+    <div class="sub">{{ c.tax_id or _('No tax number') }}{% if c.tax_office %} · {{ c.tax_office }}{% endif %}</div>
+  </div>
+  <div class="actions">
+    <a class="btn" href="{{ url_for('contacts.edit', cid=c.id) }}">{{ icon('edit') }} {{ _('Edit') }}</a>
+    <a class="btn" href="{{ url_for('books.tx_new', kind='collection', contact_id=c.id) }}">{{ icon('in') }} {{ _('Record payment') }}</a>
+    <a class="btn" href="{{ url_for('invoices.new', contact_id=c.id) }}">{{ icon('file') }} {{ _('New invoice') }}</a>
+    <a class="btn btn-primary" href="{{ url_for('orders.new', contact_id=c.id) }}">{{ icon('plus') }} {{ _('New service order') }}</a>
+    <details class="menu">
+      <summary class="btn" aria-label="{{ _('More') }}">{{ icon('more') }}</summary>
+      <div class="menu-panel">
+        <form method="post" action="{{ url_for('contacts.check_efatura', cid=c.id) }}">{{ csrf() }}<button>{{ icon('refresh', 'sm') }} {{ _('Check e-Fatura status') }}</button></form>
+        <form method="post" action="{{ url_for('contacts.archive', cid=c.id) }}">{{ csrf() }}<button>{{ icon('archive', 'sm') }} {{ _('Restore') if c.archived else _('Archive') }}</button></form>
+        <hr>
+        <form method="post" action="{{ url_for('contacts.delete', cid=c.id) }}" data-confirm="{{ _('Delete this contact permanently?') }}">{{ csrf() }}<button class="danger">{{ icon('trash', 'sm') }} {{ _('Delete') }}</button></form>
+      </div>
+    </details>
+  </div>
+</div>
+
+<div class="split">
+  <div>
+    <div class="card">
+      <div class="tabs">
+        <a href="?tab=orders" class="{{ 'active' if tab == 'orders' }}">{{ _('Service orders') }} <span class="pill">{{ orders|length }}</span></a>
+        <a href="?tab=invoices" class="{{ 'active' if tab == 'invoices' }}">{{ _('Invoices') }} <span class="pill">{{ invoices|length }}</span></a>
+        <a href="?tab=ledger" class="{{ 'active' if tab == 'ledger' }}">{{ _('Account statement') }}</a>
+      </div>
+      {% if tab == 'orders' %}
+        {% if orders %}
+        <div class="table-wrap"><table class="table">
+          <thead><tr><th>{{ _('Order') }}</th><th>{{ _('Device') }}</th><th>{{ _('Received') }}</th><th>{{ _('Status') }}</th></tr></thead>
+          <tbody>{% for o in orders %}
+            <tr class="clickable" data-href="{{ url_for('orders.view', oid=o.id) }}">
+              <td><a class="primary" href="{{ url_for('orders.view', oid=o.id) }}">{{ o.number }}</a></td>
+              <td>{{ o.device_label }}<div class="secondary">{{ o.device_type }}{% if o.serial_no %} · S/N {{ o.serial_no }}{% endif %}</div></td>
+              <td class="nowrap">{{ o.received_at|d }}</td>
+              <td>{{ status_badge(o.status) }}</td>
+            </tr>{% endfor %}
+          </tbody></table></div>
+        {% else %}{{ empty('wrench', _('No service orders yet'), '', url_for('orders.new', contact_id=c.id), _('New service order')) }}{% endif %}
+      {% elif tab == 'invoices' %}
+        {% if invoices %}
+        <div class="table-wrap"><table class="table">
+          <thead><tr><th>{{ _('Invoice') }}</th><th>{{ _('Date') }}</th><th>{{ _('Status') }}</th><th class="num">{{ _('Amount') }}</th><th class="num">{{ _('Open') }}</th></tr></thead>
+          <tbody>{% for i in invoices %}
+            <tr class="clickable" data-href="{{ url_for('invoices.view', iid=i.id) }}">
+              <td><a class="primary" href="{{ url_for('invoices.view', iid=i.id) }}">{{ i.number or _('Draft') }}</a><div class="secondary">{{ _(PROFILE_LABELS[i.profile]) }}{% if i.type_code != 'SATIS' %} · {{ _(TYPE_LABELS[i.type_code]) }}{% endif %}</div></td>
+              <td class="nowrap">{{ i.issue_date|d }}</td>
+              <td>{{ status_badge(i.status) }}</td>
+              <td class="num">{{ i.payable|money }}</td>
+              <td class="num {{ 'neg' if i.is_overdue }}">{{ i.open_amount|money(blank_zero=True) }}</td>
+            </tr>{% endfor %}
+          </tbody></table></div>
+        {% else %}{{ empty('file', _('No invoices yet')) }}{% endif %}
+      {% else %}
+        {% if ledger %}
+        <div class="table-wrap"><table class="table compact">
+          <thead><tr><th>{{ _('Date') }}</th><th>{{ _('Description') }}</th><th class="num">{{ _('Debit') }}</th><th class="num">{{ _('Credit') }}</th><th class="num">{{ _('Balance') }}</th></tr></thead>
+          <tbody>{% for r in ledger %}
+            <tr>
+              <td class="nowrap">{{ r.date|d }}</td>
+              <td>{% if r.kind == 'invoice' %}<a href="{{ url_for('invoices.view', iid=r.obj.id) }}">{{ r.doc }}</a> · {% endif %}{{ r.desc }}{% if r.kind == 'tx' %} <span class="tag">{{ _(KIND_LABELS[r.obj.kind]) }}</span>{% endif %}</td>
+              <td class="num">{{ r.debit|money(blank_zero=True) }}</td>
+              <td class="num">{{ r.credit|money(blank_zero=True) }}</td>
+              <td class="num strong">{{ r.balance|money }}</td>
+            </tr>{% endfor %}
+          </tbody></table></div>
+        {% else %}{{ empty('receipt', _('No transactions yet')) }}{% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="stack">
+    <div class="card stat">
+      <div class="label">{{ icon('wallet') }} {{ _('Balance') }}</div>
+      <div class="value {{ 'neg' if balance < 0 }}">{{ balance|money }}</div>
+      <div class="meta">{% if balance > 0 %}{{ _('Customer owes you') }}{% elif balance < 0 %}{{ _('You owe this contact') }}{% else %}{{ _('Settled') }}{% endif %}</div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>{{ _('Details') }}</h2></div>
+      <div class="card-body">
+        <dl class="dl">
+          <dt>{{ _('Phone') }}</dt><dd>{% if c.phone %}<a href="tel:{{ c.phone }}">{{ c.phone }}</a>{% else %}—{% endif %}</dd>
+          <dt>{{ _('Email') }}</dt><dd>{% if c.email %}<a href="mailto:{{ c.email }}">{{ c.email }}</a>{% else %}—{% endif %}</dd>
+          {% if c.contact_person %}<dt>{{ _('Contact person') }}</dt><dd>{{ c.contact_person }}</dd>{% endif %}
+          <dt>{{ _('Address') }}</dt><dd>{{ c.display_address or '—' }}</dd>
+          <dt>{{ _('e-Fatura alias') }}</dt><dd class="mono small">{{ c.efatura_alias or '—' }}</dd>
+          <dt>{{ _('Last GİB check') }}</dt><dd>{{ c.efatura_checked_at|dt or _('Never') }}</dd>
+          <dt>{{ _('Customer since') }}</dt><dd>{{ c.created_at|d }}</dd>
+        </dl>
+        {% if c.notes %}<hr><div class="small" style="white-space:pre-line">{{ c.notes }}</div>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

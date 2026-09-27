@@ -1,0 +1,40 @@
+{% extends "settings/_layout.html" %}
+{% block title %}{{ _('Company') }}{% endblock %}
+{% block heading %}{{ _('Settings') }}{% endblock %}
+{% block subheading %}{{ _('This information is printed on every invoice and receipt.') }}{% endblock %}
+{% block settings %}
+<form method="post" class="card">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <div class="form-section">
+    <div class="intro"><h3>{{ _('Legal identity') }}</h3><p>{{ _('Must match your GİB e-Fatura registration exactly.') }}</p></div>
+    <div>
+      <div class="field"><label class="req">{{ _('Company title') }}</label><input type="text" name="name" value="{{ s.name }}"></div>
+      <div class="form-row">
+        <div class="field"><label class="req">{{ _('VKN / TCKN') }}</label><input type="text" name="tax_id" value="{{ s.tax_id }}" inputmode="numeric" maxlength="11"></div>
+        <div class="field"><label class="req">{{ _('Tax office') }}</label><input type="text" name="tax_office" value="{{ s.tax_office }}"></div>
+        <div class="field"><label>{{ _('MERSİS no') }}</label><input type="text" name="mersis" value="{{ s.mersis }}"></div>
+        <div class="field"><label>{{ _('Trade registry no') }}</label><input type="text" name="trade_registry" value="{{ s.trade_registry }}"></div>
+      </div>
+    </div>
+  </div>
+  <div class="form-section">
+    <div class="intro"><h3>{{ _('Address & contact') }}</h3></div>
+    <div>
+      <div class="field"><label class="req">{{ _('Address') }}</label><input type="text" name="address" value="{{ s.address }}"></div>
+      <div class="form-row four">
+        <div class="field"><label class="req">{{ _('District') }}</label><input type="text" name="district" value="{{ s.district }}"></div>
+        <div class="field"><label class="req">{{ _('City') }}</label><input type="text" name="city" value="{{ s.city }}"></div>
+        <div class="field"><label>{{ _('Postal code') }}</label><input type="text" name="postal_code" value="{{ s.postal_code }}"></div>
+        <div class="field"><label>{{ _('Country') }}</label><input type="text" name="country" value="{{ s.country }}"></div>
+      </div>
+      <div class="form-row three">
+        <div class="field"><label>{{ _('Phone') }}</label><input type="tel" name="phone" value="{{ s.phone }}"></div>
+        <div class="field"><label>{{ _('Email') }}</label><input type="email" name="email" value="{{ s.email }}"></div>
+        <div class="field"><label>{{ _('Website') }}</label><input type="text" name="website" value="{{ s.website }}"></div>
+      </div>
+      <div class="field"><label>{{ _('IBAN for payments') }}</label><input type="text" name="iban" value="{{ s.iban }}" class="mono"></div>
+    </div>
+  </div>
+  <div class="form-actions"><button class="btn btn-primary">{{ _('Save') }}</button></div>
+</form>
+{% endblock %}

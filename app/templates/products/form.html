@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import csrf %}
+{% block title %}{{ p.name or _('New item') }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('products.index') }}">{{ _('Parts & services') }}</a>{{ icon('chevron-right', 'sm') }}<span>{{ p.name or _('New') }}</span></div>
+<div class="page-head"><div><h1>{{ p.name or (_('New service') if p.kind == 'service' else _('New part')) }}</h1></div>
+  {% if p.id %}<div class="actions"><form method="post" action="{{ url_for('products.archive', pid=p.id) }}" data-confirm="{{ _('Archive or delete this item?') }}">{{ csrf() }}
+    <button class="btn btn-danger">{{ icon('archive') }} {{ _('Restore') if p.archived else _('Archive / delete') }}</button></form></div>{% endif %}
+</div>
+<form method="post" class="card" style="max-width:860px">
+  {{ csrf() }}
+  <div class="form-section">
+    <div class="intro"><h3>{{ _('Item') }}</h3></div>
+    <div>
+      <div class="field"><div class="segmented">
+        <label><input type="radio" name="kind" value="part" {{ 'checked' if p.kind == 'part' }}><span>{{ icon('package', 'sm') }} {{ _('Part') }}</span></label>
+        <label><input type="radio" name="kind" value="service" {{ 'checked' if p.kind == 'service' }}><span>{{ icon('hammer', 'sm') }} {{ _('Service / labour') }}</span></label>
+      </div></div>
+      <div class="form-row" style="grid-template-columns: 160px 1fr">
+        <div class="field"><label>{{ _('Code') }}</label><input type="text" name="code" value="{{ p.code or '' }}" class="mono"></div>
+        <div class="field"><label class="req">{{ _('Name') }}</label><input type="text" name="name" value="{{ p.name or '' }}" required></div>
+      </div>
+    </div>
+  </div>
+  <div class="form-section">
+    <div class="intro"><h3>{{ _('Pricing') }}</h3><p>{{ _('Sale price excludes VAT.') }}</p></div>
+    <div class="form-row four">
+      <div class="field"><label>{{ _('Sale price (₺)') }}</label><input type="text" inputmode="decimal" class="num" name="price" value="{{ p.price|inp if p.price is not none else '' }}"></div>
+      <div class="field"><label>{{ _('Cost (₺)') }}</label><input type="text" inputmode="decimal" class="num" name="cost" value="{{ p.cost|inp if p.cost is not none else '' }}"></div>
+      <div class="field"><label>{{ _('Unit') }}</label><select name="unit">{% for code, name in units.items() %}<option value="{{ code }}" {{ 'selected' if p.unit == code }}>{{ _(name) }}</option>{% endfor %}</select></div>
+      <div class="field"><label>{{ _('VAT') }}</label><select name="vat_rate">{% for r in vat_rates %}<option value="{{ r }}" {{ 'selected' if p.vat_rate == r }}>%{{ r }}</option>{% endfor %}</select></div>
+    </div>
+  </div>
+  <div class="form-section">
+    <div class="intro"><h3>{{ _('Stock') }}</h3><p>{{ _('Only for parts. Stock goes down automatically when an invoice is issued.') }}</p></div>
+    <div>
+      <label class="check"><input type="checkbox" name="track_stock" value="1" {{ 'checked' if p.track_stock }}><span>{{ _('Track stock for this part') }}</span></label>
+      <div class="form-row">
+        {% if not p.id %}<div class="field"><label>{{ _('Opening stock') }}</label><input type="text" inputmode="decimal" class="num" name="stock_qty" value="0"></div>
+        {% else %}<div class="field"><label>{{ _('Current stock') }}</label><input type="text" class="num" value="{{ p.stock_qty|num(None) }}" readonly></div>{% endif %}
+        <div class="field"><label>{{ _('Minimum stock (warning)') }}</label><input type="text" inputmode="decimal" class="num" name="min_stock" value="{{ p.min_stock|inp('qty') if p.min_stock is not none else '0' }}"></div>
+      </div>
+    </div>
+  </div>
+  <div class="form-actions"><a class="btn btn-ghost" href="{{ url_for('products.index') }}">{{ _('Cancel') }}</a><button class="btn btn-primary">{{ _('Save') }}</button></div>
+</form>
+{% endblock %}

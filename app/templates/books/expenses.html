@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import empty, csrf %}
+{% block title %}{{ _('Expenses') }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ _('Expenses') }}</h1><div class="sub">{{ _('Purchases and running costs. Their VAT is deductible.') }}</div></div>
+  <div class="actions">
+    <a class="btn" href="{{ url_for('reports.export', what='expenses', **{'from': dfrom.isoformat()}) }}">{{ icon('download') }} {{ _('Export') }}</a>
+    <a class="btn btn-primary" href="{{ url_for('books.expense_form') }}">{{ icon('plus') }} {{ _('New expense') }}</a>
+  </div>
+</div>
+<div class="grid grid-3" style="margin-bottom:16px">
+  <div class="card stat"><div class="label">{{ _('Net') }}</div><div class="value">{{ totals.net|money }}</div></div>
+  <div class="card stat"><div class="label">{{ _('Deductible VAT') }}</div><div class="value">{{ totals.vat|money }}</div></div>
+  <div class="card stat"><div class="label">{{ _('Total') }}</div><div class="value">{{ totals.total|money }}</div></div>
+</div>
+<div class="card">
+  <form class="toolbar">
+    <div class="search">{{ icon('search', 'sm') }}<input type="search" name="q" value="{{ q }}" placeholder="{{ _('Supplier, document, description…') }}"></div>
+    <select name="category" style="width:auto"><option value="">{{ _('All categories') }}</option>{% for c in categories %}<option {{ 'selected' if c == cat }}>{{ c }}</option>{% endfor %}</select>
+    <input type="date" name="from" value="{{ dfrom.isoformat() }}" style="width:auto" aria-label="{{ _('From') }}">
+    <input type="date" name="to" value="{{ dto.isoformat() if dto else '' }}" style="width:auto" aria-label="{{ _('To') }}">
+    <button class="btn btn-sm">{{ _('Filter') }}</button>
+  </form>
+  {% if rows %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>{{ _('Date') }}</th><th>{{ _('Category') }}</th><th>{{ _('Supplier') }}</th><th class="num">{{ _('Net') }}</th><th class="num">{{ _('VAT') }}</th><th class="num">{{ _('Total') }}</th><th>{{ _('Paid') }}</th><th></th></tr></thead>
+    <tbody>{% for e in rows %}
+      <tr class="clickable" data-href="{{ url_for('books.expense_form', eid=e.id) }}">
+        <td class="nowrap">{{ e.date|d }}</td>
+        <td><div class="primary">{{ e.category }}</div><div class="secondary">{{ e.description }}{% if e.doc_no %} · {{ e.doc_no }}{% endif %}</div></td>
+        <td class="ellipsis" style="max-width:220px">{{ e.contact.name if e.contact else '—' }}</td>
+        <td class="num">{{ e.net|money }}</td><td class="num muted">{{ e.vat|money }}</td><td class="num strong">{{ e.total|money }}</td>
+        <td>{% if e.paid_amount >= e.total %}<span class="tag green">{{ _('Paid') }}</span>{% elif e.contact %}<span class="tag amber">{{ _('On account') }}</span>{% else %}<span class="tag">—</span>{% endif %}</td>
+        <td class="actions"><form method="post" action="{{ url_for('books.expense_delete', eid=e.id) }}" class="inline" data-confirm="{{ _('Delete this expense and its payment?') }}">{{ csrf() }}<button class="icon-btn" style="color:var(--faint)" title="{{ _('Delete') }}">{{ icon('trash', 'sm') }}</button></form></td>
+      </tr>{% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}{{ empty('receipt', _('No expenses in this period'), '', url_for('books.expense_form'), _('New expense')) }}{% endif %}
+</div>
+{% endblock %}

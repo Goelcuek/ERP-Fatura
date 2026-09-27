@@ -1,0 +1,16 @@
+# systemd unit for a Linux server. Copy to /etc/systemd/system/erp.service, adjust paths, then:
+#   sudo systemctl enable --now erp
+[Unit]
+Description=Atölye ERP
+After=network.target
+
+[Service]
+Type=simple
+User=erp
+WorkingDirectory=/opt/erp-fatura
+Environment=ERP_DATA_DIR=/opt/erp-fatura/data
+ExecStart=/opt/erp-fatura/.venv/bin/python run.py --port 8080
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

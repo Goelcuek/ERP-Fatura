@@ -1,0 +1,39 @@
+{% extends "settings/_layout.html" %}
+{% block title %}{{ _('Invoicing') }}{% endblock %}
+{% block heading %}{{ _('Settings') }}{% endblock %}
+{% block subheading %}{{ _('Numbering, defaults and printed texts.') }}{% endblock %}
+{% block settings %}
+<form method="post" class="card">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <div class="form-section">
+    <div class="intro"><h3>{{ _('Invoice series') }}</h3><p>{{ _('GİB numbers are 3 characters + year + 9-digit sequence, e.g. EFT2026000000001. Use the same series your integrator has on file.') }}</p></div>
+    <div class="form-row">
+      <div class="field"><label>{{ _('e-Fatura series') }}</label><input type="text" name="efatura_prefix" value="{{ s.efatura_prefix }}" maxlength="3" class="mono" style="text-transform:uppercase"></div>
+      <div class="field"><label>{{ _('e-Arşiv series') }}</label><input type="text" name="earsiv_prefix" value="{{ s.earsiv_prefix }}" maxlength="3" class="mono" style="text-transform:uppercase"></div>
+      <div class="field"><label>{{ _('e-Fatura: start from number') }}</label><input type="number" min="1" name="efatura_start" value="{{ s.efatura_start }}"></div>
+      <div class="field"><label>{{ _('e-Arşiv: start from number') }}</label><input type="number" min="1" name="earsiv_start" value="{{ s.earsiv_start }}"></div>
+      <div class="hint span-2" style="margin-top:-8px">{{ _('Switching from another program mid-year? Enter the next sequence number after the last invoice it issued, e.g. 158 if the last one was EFT2026000000157.') }}</div>
+    </div>
+  </div>
+  <div class="form-section">
+    <div class="intro"><h3>{{ _('Defaults') }}</h3></div>
+    <div class="form-row three">
+      <div class="field"><label>{{ _('Default e-Fatura profile') }}</label><select name="default_profile">
+        {% for p in ['TICARIFATURA', 'TEMELFATURA'] %}<option value="{{ p }}" {{ 'selected' if s.default_profile == p }}>{{ _(PROFILE_LABELS[p]) }}</option>{% endfor %}</select></div>
+      <div class="field"><label>{{ _('Default VAT') }}</label><select name="default_vat">{% for r in [0, 1, 10, 20] %}<option value="{{ r }}" {{ 'selected' if s.default_vat == r }}>%{{ r }}</option>{% endfor %}</select></div>
+      <div class="field"><label>{{ _('Payment term (days)') }}</label><input type="number" name="default_due_days" min="0" value="{{ s.default_due_days }}"></div>
+    </div>
+  </div>
+  <div class="form-section">
+    <div class="intro"><h3>{{ _('Printed texts') }}</h3></div>
+    <div>
+      <div class="field"><label>{{ _('Invoice footer note') }}</label><textarea name="footer_note" rows="2">{{ s.footer_note }}</textarea></div>
+      <div class="form-row" style="grid-template-columns:160px 1fr">
+        <div class="field"><label>{{ _('Service order prefix') }}</label><input type="text" name="orders_prefix" value="{{ o.prefix }}" class="mono" maxlength="6"></div>
+        <div class="field"><label>{{ _('Terms on intake receipt') }}</label><textarea name="orders_terms" rows="3">{{ o.terms }}</textarea></div>
+      </div>
+    </div>
+  </div>
+  <div class="form-actions"><button class="btn btn-primary">{{ _('Save') }}</button></div>
+</form>
+{% endblock %}
