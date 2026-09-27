@@ -1,6 +1,7 @@
 from urllib.parse import urlparse
 
-from flask import Blueprint, abort, flash, g, redirect, render_template, request, send_file, session, url_for
+from flask import (Blueprint, abort, current_app, flash, g, redirect, render_template, request, send_file,
+                   session, url_for)
 
 from ..extensions import db
 from ..i18n import LANGUAGES, _
@@ -24,12 +25,21 @@ def login():
     if User.query.count() == 0:
         return redirect(url_for("auth.setup"))
     if request.method == "POST":
-        user = User.query.filter_by(username=f_str("username").lower()).first()
+        throttle = current_app.login_throttle
+        username = f_str("username").lower()
+        keys = (f"u:{username}", f"ip:{request.remote_addr}")  # lock the account and the device separately
+        wait = throttle.retry_after(*keys)
+        if wait:
+            flash(_("Too many failed attempts. Please wait {n} seconds and try again.", n=wait), "error")
+            return render_template("auth/login.html"), 429
+        user = User.query.filter_by(username=username).first()
         if user and user.active and user.check_password(request.form.get("password", "")):
+            throttle.record_success(*keys)
             session.clear()
             session["uid"] = user.id
             session.permanent = True
             return redirect(_safe_next(request.args.get("next")) or url_for("dashboard.index"))
+        throttle.record_failure(*keys)
         flash(_("Invalid username or password."), "error")
     return render_template("auth/login.html")
 

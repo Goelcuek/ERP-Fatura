@@ -187,6 +187,9 @@ def init_web(app):
         reldays=rel_days,
     )
     from .services.integrators import REGISTRY
+    from .services.security import LoginThrottle, host_allowed
+
+    app.login_throttle = LoginThrottle()
 
     app.jinja_env.globals.update(
         INTEGRATOR_LABELS={k: c.label for k, c in REGISTRY.items()},
@@ -200,6 +203,13 @@ def init_web(app):
         UNITS=UNITS,
         today=date.today,
     )
+
+    @app.before_request
+    def check_host():
+        # reject a Host header that is not one of this PC's own names/addresses (blocks DNS rebinding).
+        if app.config.get("ENFORCE_HOST_ALLOWLIST", True) and not host_allowed(request.host):
+            abort(400)
+        return None
 
     @app.before_request
     def load_user():

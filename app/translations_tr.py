@@ -1110,4 +1110,5 @@ TR = {
     'e-Fatura connection': 'e-Fatura bağlantısı',
     '“{num}” is not an invoice number: 3 letters or digits, the year and 9 digits, e.g. ABC{year}000000123.': '“{num}” bir fatura numarası değil: 3 harf veya rakam, yıl ve 9 rakam olmalı, örn. ABC{year}000000123.',
     'e.g.': 'örn.',
+    'Too many failed attempts. Please wait {n} seconds and try again.': 'Çok fazla başarısız deneme. Lütfen {n} saniye bekleyip tekrar deneyin.',
 }

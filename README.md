@@ -309,6 +309,22 @@ certificate over plain http (a phone can't open an https page it doesn't trust y
 to https. Reserve a fixed address for the PC in the router (DHCP reservation) so the phones' shortcuts keep working.
 In Docker, set `ERP_LAN_IP` to the host's LAN address (see `docker-compose.yml`).
 
+### Network security
+
+The app is meant to run only on the shop's local network — never port-forward it to the internet. Two defences
+harden it against the risks that remain when work phones and the PC are also online:
+
+- **Login lockout.** After 5 wrong passwords for an account (or from one device) logins are refused for a growing
+  cool-off (30 s, then doubling), so a device that catches malware can't brute-force the login.
+- **Host allow-list.** Requests are only served for this PC's own names and LAN addresses. This blocks *DNS
+  rebinding*, where a web page a technician visits tries to make their browser reach the app under an
+  attacker-controlled hostname. Combined with the certificate, CSRF tokens and `SameSite` cookies, a malicious
+  website cannot read or change shop data through a phone that is on the shop Wi-Fi.
+
+The biggest remaining risk is the **PC itself**: it holds the database, backups and integrator credentials, so treat
+it as an appliance — don't use it for casual web browsing or email, use a strong Wi-Fi password, and give each person
+their own account with a real password.
+
 ## Accounting scope
 
 This is **pre-accounting (ön muhasebe)**: it tracks sales, purchases, receivables, payables, cash and bank, and
