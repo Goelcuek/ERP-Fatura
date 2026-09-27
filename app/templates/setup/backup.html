@@ -1,0 +1,28 @@
+{% extends "setup/_layout.html" %}
+{% block wizard %}
+<h1>{{ _('Backups') }}</h1>
+<p class="sub">{{ _('The app backs itself up every day on this computer. Add a second place so a copy survives if this computer breaks or is stolen.') }}</p>
+<form method="post">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <label class="check"><input type="checkbox" name="enabled" value="1" {{ 'checked' if s.enabled }}>
+    <span>{{ _('Automatic backups') }}<small>{{ _('Every {hours} hours; the last {keep} are kept.', hours=s.interval_hours, keep=s.keep) }}</small></span></label>
+  <div class="field" style="margin-top:14px"><label>{{ _('Second copy folder') }}</label>
+    <input type="text" name="extra_dir" value="{{ s.extra_dir }}" class="mono" placeholder="E:\Atolye-Yedek" data-extra-dir>
+    <div class="hint">{{ _('A USB disk (e.g. E:\\Atolye-Yedek) or a OneDrive / Google Drive folder on this computer. The folder is created if needed.') }}</div>
+    {% if suggestions %}<div class="wizard-suggest">{% for p in suggestions %}<button type="button" class="tag blue" data-suggest="{{ p }}">{{ icon('check', 'sm') }} {{ p }}</button>{% endfor %}</div>{% endif %}
+  </div>
+  <label class="check"><input type="checkbox" name="backup_now" value="1" checked>
+    <span>{{ _('Make a first backup now') }}<small>{{ _('Also checks that the second folder works.') }}</small></span></label>
+
+  <div class="wizard-actions">
+    <a class="btn btn-ghost" href="{{ url_for('wizard.efatura') }}">{{ icon('undo', 'sm') }} {{ _('Back') }}</a>
+    <span class="spacer"></span>
+    <button class="btn btn-primary btn-lg">{{ _('Save and continue') }} {{ icon('chevron-right', 'sm') }}</button>
+  </div>
+</form>
+<script>
+  document.querySelectorAll("[data-suggest]").forEach(function (b) {
+    b.addEventListener("click", function () { document.querySelector("[data-extra-dir]").value = b.dataset.suggest; });
+  });
+</script>
+{% endblock %}

@@ -74,6 +74,11 @@
     </header>
 
     <main class="content">
+      {% if setup_pending and not ep.startswith('wizard.') %}
+      <div class="alert alert-info setup-banner">{{ icon('info') }}<div class="body"><b>{{ _('Setup is not finished.') }}</b>
+        {{ _('Company details, invoice numbers, e-Fatura connection and backups — a few minutes.') }}</div>
+        <a class="btn btn-sm btn-primary" href="{{ url_for('wizard.resume') }}">{{ _('Continue setup') }}</a></div>
+      {% endif %}
       {% block content %}{% endblock %}
     </main>
   </div>

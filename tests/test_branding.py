@@ -30,9 +30,11 @@ def test_customer_preset_prefills_first_run(tmp_path):
                       "CUSTOMER": {"company_name": "Çağ-Tek Makina", "short_name": "Çağ-Tek Makina"}})
     c = app.test_client()
     html = c.get("/setup").get_data(as_text=True)
-    assert 'value="Çağ-Tek Makina"' in html
     assert "<title>İlk kurulum · Çağ-Tek Makina</title>" in html
     assert ">ÇT<" in html
+    c.post("/setup", data={"full_name": "Sahip", "username": "sahip", "password": "longpassword",
+                           "password2": "longpassword", "lang": "tr"})
+    assert 'value="Çağ-Tek Makina"' in c.get("/setup/company").get_data(as_text=True)
 
 
 def test_repo_preset_is_cag_tek():

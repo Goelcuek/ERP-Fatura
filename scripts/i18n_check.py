@@ -38,6 +38,10 @@ def extract():
     from app.services.assistant.agent import NOT_UNDERSTOOD, STILL_DOWNLOADING
 
     found.update([NOT_UNDERSTOOD, STILL_DOWNLOADING])
+    from app.routes.settings import NOT_A_NUMBER
+    from app.routes.setup import STEP_TITLES
+
+    found.update([NOT_A_NUMBER, *STEP_TITLES.values()])
     for cls in REGISTRY.values():
         found.update([cls.label, cls.description])
         for f in cls.fields:

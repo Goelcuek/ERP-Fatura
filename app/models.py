@@ -66,10 +66,13 @@ class Setting(db.Model):
         "company.website": "",
         "company.iban": "",
         "company.logo": "",
+        "setup.pending": False,  # the first-run wizard was started but not finished
+        "setup.step": "company",
         "invoice.efatura_prefix": "EFT",
         "invoice.earsiv_prefix": "ARS",
         "invoice.efatura_start": 1,  # first sequence number to use (continue from a previous system)
         "invoice.earsiv_start": 1,
+        "invoice.start_year": "",  # the year the starting numbers are for ("" = any year)
         "invoice.default_profile": "TICARIFATURA",
         "invoice.default_vat": 20,
         "invoice.default_due_days": 30,

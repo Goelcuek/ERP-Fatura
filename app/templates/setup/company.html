@@ -1,0 +1,62 @@
+{% extends "setup/_layout.html" %}
+{% block wizard %}
+<h1>{{ _('Company & logo') }}</h1>
+<p class="sub">{{ _('Printed on every invoice and receipt. The title and tax details must match your GİB registration exactly.') }}</p>
+<form method="post" enctype="multipart/form-data">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <div class="field"><label class="req">{{ _('Company title') }}</label><input type="text" name="name" value="{{ s.name }}" required autofocus>
+    <div class="hint">{{ _('Write the full legal title exactly as registered with GİB, e.g. “… San. ve Tic. Ltd. Şti.”. The app shows a shorter name in the menu.') }}</div></div>
+  <div class="form-row">
+    <div class="field"><label class="req">{{ _('VKN / TCKN') }}</label><input type="text" name="tax_id" value="{{ s.tax_id }}" inputmode="numeric" maxlength="11"></div>
+    <div class="field"><label class="req">{{ _('Tax office') }}</label><input type="text" name="tax_office" value="{{ s.tax_office }}"></div>
+  </div>
+  <div class="field"><label class="req">{{ _('Address') }}</label><input type="text" name="address" value="{{ s.address }}"></div>
+  <div class="form-row three">
+    <div class="field"><label class="req">{{ _('District') }}</label><input type="text" name="district" value="{{ s.district }}"></div>
+    <div class="field"><label class="req">{{ _('City') }}</label><input type="text" name="city" value="{{ s.city }}"></div>
+    <div class="field"><label>{{ _('Postal code') }}</label><input type="text" name="postal_code" value="{{ s.postal_code }}"></div>
+  </div>
+  <div class="form-row">
+    <div class="field"><label>{{ _('Phone') }}</label><input type="tel" name="phone" value="{{ s.phone }}"></div>
+    <div class="field"><label>{{ _('Email') }}</label><input type="email" name="email" value="{{ s.email }}"></div>
+  </div>
+  <div class="field"><label>{{ _('IBAN for payments') }}</label><input type="text" name="iban" value="{{ s.iban }}" class="mono"></div>
+  <details class="wizard-more" {{ 'open' if s.mersis or s.trade_registry }}>
+    <summary>{{ _('MERSİS and trade registry numbers (optional)') }}</summary>
+    <div class="form-row">
+      <div class="field"><label>{{ _('MERSİS no') }}</label><input type="text" name="mersis" value="{{ s.mersis }}"></div>
+      <div class="field"><label>{{ _('Trade registry no') }}</label><input type="text" name="trade_registry" value="{{ s.trade_registry }}"></div>
+    </div>
+  </details>
+
+  <div class="field">
+    <label>{{ _('Logo') }}</label>
+    <label class="logo-drop">
+      <span class="logo-drop-preview" data-logo-preview>
+        {% if has_logo %}<img src="{{ url_for('auth.logo') }}?v={{ range(100000)|random }}" alt="">
+        {% else %}<span class="brand-mark mono-mark">{{ brand_initials }}</span>{% endif %}
+      </span>
+      <span><b>{{ _('Choose a logo') }}</b><br><span class="small muted">{{ _('PNG or JPG, up to 300 KB. Shown in the app, on receipts and inside every e-invoice. Without a logo the initials are used.') }}</span></span>
+      <input type="file" name="logo" accept="image/png,image/jpeg" data-logo-input>
+    </label>
+  </div>
+
+  <div class="wizard-actions">
+    <a class="btn btn-ghost" href="{{ url_for('wizard.invoicing') }}">{{ _('Skip for now') }}</a>
+    <button class="btn btn-primary btn-lg">{{ _('Save and continue') }} {{ icon('chevron-right', 'sm') }}</button>
+  </div>
+</form>
+<script>
+  (function () {
+    var input = document.querySelector("[data-logo-input]"), box = document.querySelector("[data-logo-preview]");
+    input.addEventListener("change", function () {
+      var f = input.files[0];
+      if (!f) return;
+      var img = document.createElement("img");
+      img.src = URL.createObjectURL(f);
+      box.innerHTML = "";
+      box.appendChild(img);
+    });
+  })();
+</script>
+{% endblock %}

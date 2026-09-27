@@ -72,7 +72,8 @@ Requires **Python 3.10+**. No database server — data is a single SQLite file.
 ./start.sh                     # or: pip install -r requirements.txt && python run.py
 ```
 
-Open <http://localhost:8080>. On first launch a setup page creates the administrator account. Other computers,
+Open <http://localhost:8080>. On first launch a setup wizard asks for everything the shop needs (see
+[First-run setup](#first-run-setup--no-files-to-edit)). Other computers,
 tablets and phones on the same network use the address printed in the console, e.g. `http://192.168.1.20:8080`
 (for phones see [Phones and tablets](#phones-and-tablets)).
 
@@ -88,21 +89,31 @@ docker compose up -d           # data is kept in ./data; an Ollama container ser
 flask --app app seed-demo      # then log in with  demo / demo1234
 ```
 
-## This installation: Çağ-Tek Makina
+## First-run setup — no files to edit
 
-`customer.json` holds the defaults for this customer's installation:
+The first start opens a setup wizard ([screenshot](docs/screenshots/setup-wizard.png)); every step can be skipped
+and changed later in Settings:
 
-```json
-{ "company_name": "Çağ-Tek Makina", "short_name": "Çağ-Tek Makina" }
-```
+1. **Your account** — the administrator. *Moving to a new computer?* The same screen restores everything from a
+   backup zip instead.
+2. **Company & logo** — the legal title exactly as registered with GİB (e.g. "Çağ-Tek Makina San. ve Tic. Ltd.
+   Şti."; the menu shows the short name automatically), VKN/TCKN, tax office, address, IBAN and the logo (PNG/JPG,
+   up to 300 KB, previewed immediately). The logo appears in the app, on receipts and printouts, as the phone app
+   icon and inside every e-invoice. Without one the initials are used ("ÇT").
+3. **Invoice numbers** — type the last number the previous program issued this year (e.g. `CGT2026000000123`);
+   the app takes the series from it and continues with …124. A number from an earlier year means this year starts
+   at 1, and starting numbers only ever apply to the year they were set for.
+4. **e-Fatura connection** — Uyumsoft web service username/password, test or production, with a *Save & test
+   connection* button; or *decide later* (practice mode, nothing reaches GİB).
+5. **Backups** — second copy folder (USB disk or OneDrive/Google Drive folder; a OneDrive folder on the PC is
+   suggested automatically) and a first backup that proves the folder works.
+6. **Summary** — what is done, what is missing, the next invoice numbers, and links to add users and connect phones.
 
-The first-run setup is pre-filled with the name, and the app, login screen, receipts and printouts show it (with an
-"ÇT" monogram until a logo is uploaded in **Settings → Company → Logo**). The uploaded logo is also embedded in the
-display template of every e-invoice, so Çağ-Tek's customers see it on the invoices they receive.
+Until the wizard is finished, administrators see a *Continue setup* banner.
 
-Before issuing invoices, enter in **Settings → Company** the full legal title exactly as registered with GİB
-(e.g. "Çağ-Tek Makina San. ve Tic. Ltd. Şti." — the menu shows the short name automatically), VKN, tax office,
-address and IBAN. For another customer, edit `customer.json` (or point `ERP_CUSTOMER_FILE` at a different file).
+`customer.json` is optional: it only pre-fills the company name in step 2 (and the login screen before setup). This
+installation ships with `{ "company_name": "Çağ-Tek Makina", "short_name": "Çağ-Tek Makina" }`; without the file
+the wizard simply starts empty.
 
 ## Where the data lives — and backing it up
 

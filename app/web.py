@@ -12,7 +12,7 @@ from .extensions import db
 from .i18n import _
 from .models import UNITS, Setting, User
 
-PUBLIC_ENDPOINTS = {"auth.login", "auth.setup", "auth.logo", "static",
+PUBLIC_ENDPOINTS = {"auth.login", "auth.setup", "auth.setup_restore", "auth.logo", "static",
                     # phone set-up and home-screen app files (fetched before or without a login)
                     "mobile.start", "mobile.ca", "mobile.manifest", "mobile.icon", "mobile.apple_icon",
                     "mobile.service_worker", "mobile.offline"}
@@ -234,7 +234,8 @@ def init_web(app):
         short = branding.short_name()
         return {"company_name": name, "brand_name": short, "brand_initials": branding.initials(short),
                 "has_logo": bool(branding.logo_path()),
-                "assistant_enabled": bool(g.get("user")) and bool(Setting.get("assistant.enabled"))}
+                "assistant_enabled": bool(g.get("user")) and bool(Setting.get("assistant.enabled")),
+                "setup_pending": bool(g.get("user")) and g.user.is_admin and bool(Setting.get("setup.pending"))}
 
     @app.after_request
     def security_headers(resp):

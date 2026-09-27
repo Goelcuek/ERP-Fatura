@@ -1,0 +1,46 @@
+{% extends "setup/_layout.html" %}
+{% block wizard %}
+<h1>{{ _('e-Fatura connection') }}</h1>
+<p class="sub">{{ _('Invoices are sent to GİB through Uyumsoft. Enter the web service account Uyumsoft gave for this company.') }}</p>
+<form method="post">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <div class="option-cards" style="margin-bottom:16px">
+    <label class="option-card"><input type="radio" name="integrator" value="uyumsoft" {{ 'checked' if uyumsoft }} data-integ>
+      <span><b>Uyumsoft</b><p>{{ _('Send e-Fatura and e-Arşiv invoices for real.') }}</p></span></label>
+    <label class="option-card"><input type="radio" name="integrator" value="mock" {{ 'checked' if not uyumsoft }} data-integ>
+      <span><b>{{ _('Decide later (practice mode)') }}</b><p>{{ _('Invoices are only simulated, nothing reaches GİB. Good for learning the app.') }}</p></span></label>
+  </div>
+  <fieldset class="wizard-box" data-uyumsoft>
+    <legend>Uyumsoft</legend>
+    <div class="field"><label>{{ _('Environment') }}</label>
+      <div class="segmented">
+        <label><input type="radio" name="uyumsoft__environment" value="test" {{ 'checked' if cfg.get('environment', 'test') == 'test' }}><span>{{ _('Test') }}</span></label>
+        <label><input type="radio" name="uyumsoft__environment" value="production" {{ 'checked' if cfg.get('environment') == 'production' }}><span>{{ _('Production') }}</span></label>
+      </div>
+      <div class="hint">{{ _('Test: Uyumsoft’s test service, invoices are not valid (test account: Uyumsoft / Uyumsoft). Production: real invoices, uses credits.') }}</div></div>
+    <div class="form-row">
+      <div class="field"><label>{{ _('Web service username') }}</label><input type="text" name="uyumsoft__username" value="{{ cfg.get('username', '') }}" autocomplete="off"></div>
+      <div class="field"><label>{{ _('Web service password') }}</label><input type="password" name="uyumsoft__password" autocomplete="new-password"
+        placeholder="{{ '••••••••  ' ~ _('(saved — leave empty to keep)') if cfg.get('password') else '' }}"></div>
+    </div>
+    <button class="btn" name="test" value="1">{{ icon('plug') }} {{ _('Save & test connection') }}</button>
+  </fieldset>
+
+  <div class="wizard-actions">
+    <a class="btn btn-ghost" href="{{ url_for('wizard.invoicing') }}">{{ icon('undo', 'sm') }} {{ _('Back') }}</a>
+    <span class="spacer"></span>
+    <button class="btn btn-primary btn-lg">{{ _('Save and continue') }} {{ icon('chevron-right', 'sm') }}</button>
+  </div>
+</form>
+<script>
+  (function () {
+    var box = document.querySelector("[data-uyumsoft]");
+    function sync() {
+      var on = document.querySelector("[data-integ]:checked").value === "uyumsoft";
+      box.hidden = !on;
+    }
+    document.querySelectorAll("[data-integ]").forEach(function (r) { r.addEventListener("change", sync); });
+    sync();
+  })();
+</script>
+{% endblock %}

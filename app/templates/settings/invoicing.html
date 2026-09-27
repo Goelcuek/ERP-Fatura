@@ -12,6 +12,7 @@
       <div class="field"><label>{{ _('e-Arşiv series') }}</label><input type="text" name="earsiv_prefix" value="{{ s.earsiv_prefix }}" maxlength="3" class="mono" style="text-transform:uppercase"></div>
       <div class="field"><label>{{ _('e-Fatura: start from number') }}</label><input type="number" min="1" name="efatura_start" value="{{ s.efatura_start }}"></div>
       <div class="field"><label>{{ _('e-Arşiv: start from number') }}</label><input type="number" min="1" name="earsiv_start" value="{{ s.earsiv_start }}"></div>
+      <div class="hint span-2">{{ _('Starting numbers are for continuing from a previous program in {year}. Next year both series start at 1 again.', year=today().year) }}</div>
       <div class="hint span-2" style="margin-top:-8px">{{ _('Switching from another program mid-year? Enter the next sequence number after the last invoice it issued, e.g. 158 if the last one was EFT2026000000157.') }}</div>
     </div>
   </div>

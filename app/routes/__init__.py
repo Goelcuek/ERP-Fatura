@@ -6,9 +6,11 @@ from ..services.calc import to_decimal
 
 
 def register_blueprints(app):
-    from . import assistant, auth, books, contacts, dashboard, invoices, mobile, orders, products, reports, settings
+    from . import (assistant, auth, books, contacts, dashboard, invoices, mobile, orders, products, reports, settings,
+                   setup)
 
-    for mod in (auth, dashboard, contacts, orders, invoices, products, books, reports, settings, assistant, mobile):
+    for mod in (auth, dashboard, contacts, orders, invoices, products, books, reports, settings, assistant, mobile,
+                setup):
         app.register_blueprint(mod.bp)
 
 

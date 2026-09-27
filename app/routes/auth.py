@@ -1,6 +1,6 @@
 from urllib.parse import urlparse
 
-from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, send_file, session, url_for
+from flask import Blueprint, abort, flash, g, redirect, render_template, request, send_file, session, url_for
 
 from ..extensions import db
 from ..i18n import LANGUAGES, _
@@ -42,7 +42,7 @@ def logout():
 
 @bp.route("/setup", methods=["GET", "POST"])
 def setup():
-    """First-run wizard: create the admin account and basic company details."""
+    """First run, step 1: the administrator account. The setup wizard (routes/setup.py) does the rest."""
     if User.query.count() > 0:
         return redirect(url_for("auth.login"))
     if request.method == "POST":
@@ -58,18 +58,47 @@ def setup():
         if errors:
             for e in errors:
                 flash(e, "error")
-            return render_template("auth/setup.html", form=request.form)
+            return render_template("setup/account.html", form=request.form, step="account")
         user = User(username=username, full_name=f_str("full_name"), role="admin", lang=f_str("lang") or "tr")
         user.set_password(pw)
         db.session.add(user)
-        for key in ("name", "tax_id", "tax_office", "city", "district", "phone"):
-            Setting.set(f"company.{key}", f_str(key))
+        Setting.set("setup.pending", True)
+        Setting.set("setup.step", "company")
         db.session.commit()
         session.clear()
         session["uid"] = user.id
-        flash(_("Welcome! Complete your company details in Settings before issuing invoices."), "success")
-        return redirect(url_for("dashboard.index"))
-    return render_template("auth/setup.html", form={"name": current_app.config["CUSTOMER"].get("company_name", "")})
+        return redirect(url_for("wizard.company"))
+    return render_template("setup/account.html", form={}, step="account")
+
+
+@bp.route("/setup/restore", methods=["POST"])
+def setup_restore():
+    """First run on a new computer: bring everything over from a backup instead of setting up."""
+    import os
+    import tempfile
+
+    from ..services import backup as backup_svc
+
+    if User.query.count() > 0:
+        return redirect(url_for("auth.login"))
+    upload = request.files.get("file")
+    if not upload or not upload.filename:
+        flash(_("Choose a backup to restore."), "error")
+        return redirect(url_for("auth.setup"))
+    fd, tmp = tempfile.mkstemp(suffix=".zip")
+    os.close(fd)
+    try:
+        upload.save(tmp)
+        manifest, _safety = backup_svc.restore(tmp)
+    except backup_svc.BackupError as e:
+        flash(_("Restore failed: {err}", err=_(str(e))), "error")
+        return redirect(url_for("auth.setup"))
+    finally:
+        os.remove(tmp)
+    session.clear()
+    flash(_("Restored backup from {date}. Sign in with your usual account.", date=manifest.get("created_at", "?")),
+          "success")
+    return redirect(url_for("auth.login"))
 
 
 @bp.route("/branding/logo")

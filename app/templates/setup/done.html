@@ -1,0 +1,28 @@
+{% extends "setup/_layout.html" %}
+{% macro row(ok, title, text, fix) %}
+  <li class="{{ 'ok' if ok else 'todo' }}">
+    <span class="mark">{{ icon('check' if ok else 'warning', 'sm') }}</span>
+    <span><b>{{ title }}</b><br><span class="small muted">{{ text }}</span></span>
+    {% if not ok and fix %}<a class="btn btn-sm" href="{{ fix }}">{{ _('Complete') }}</a>{% endif %}
+  </li>
+{% endmacro %}
+{% block wizard %}
+<h1>{{ _('All set') }}</h1>
+<p class="sub">{{ _('Here is what was set up. Anything marked can be completed now or later in Settings.') }}</p>
+<ul class="wizard-summary">
+  {{ row(company.name and company.tax_id and company.tax_office and company.address, _('Company'),
+         company.name ~ (' · ' ~ company.tax_id if company.tax_id else ' · ' ~ _('VKN / TCKN missing')), url_for('wizard.company')) }}
+  {{ row(has_logo_file, _('Logo'), _('Uploaded') if has_logo_file else _('Not uploaded — the initials are used'), url_for('wizard.company')) }}
+  {{ row(numbers.TICARIFATURA and numbers.EARSIVFATURA, _('Invoice numbers'),
+         _('Next e-Fatura: {a} · next e-Arşiv: {b}', a=numbers.TICARIFATURA or '—', b=numbers.EARSIVFATURA or '—'), url_for('wizard.invoicing')) }}
+  {{ row(integrator_key != 'mock', _('e-Fatura connection'),
+         (integrator ~ ' · ' ~ (_('Production') if environment == 'production' else _('Test'))) if integrator_key != 'mock' else _('Practice mode — invoices are only simulated'), url_for('wizard.efatura')) }}
+  {{ row(b.enabled and b.extra_dir, _('Backups'),
+         (_('Automatic, second copy in {path}', path=b.extra_dir) if b.extra_dir else _('Only on this computer — add a second folder')) if b.enabled else _('Automatic backups are off'), url_for('wizard.backup')) }}
+</ul>
+<div class="wizard-next">
+  <a class="btn" href="{{ url_for('settings.user_form') }}">{{ icon('users') }} {{ _('Add users') }}</a>
+  <a class="btn" href="{{ url_for('mobile.connect') }}">{{ icon('smartphone') }} {{ _('Connect phones') }}</a>
+  <a class="btn btn-primary btn-lg" href="{{ url_for('dashboard.index') }}">{{ _('Start using the app') }} {{ icon('chevron-right', 'sm') }}</a>
+</div>
+{% endblock %}

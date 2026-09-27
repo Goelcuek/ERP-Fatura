@@ -34,6 +34,9 @@ def next_invoice_number(profile, year):
     stem = f"{prefix}{year}"
     last = db.session.query(func.max(Invoice.number)).filter(Invoice.number.like(stem + "%")).scalar()
     start = int(Setting.get("invoice.earsiv_start" if profile == "EARSIVFATURA" else "invoice.efatura_start") or 1)
+    start_year = Setting.get("invoice.start_year")
+    if start_year and int(start_year) != int(year):
+        start = 1  # continuing from a previous program applies to that year; a new year starts at 1
     seq = max(int(last[len(stem):]) + 1 if last else 1, start)
     return f"{stem}{seq:09d}"
 

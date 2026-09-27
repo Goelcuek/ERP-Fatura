@@ -1,0 +1,25 @@
+{% extends "auth/_layout.html" %}
+{% set step_index = WIZARD_STEPS|map('first')|list %}
+{% set current = step_index.index(step) %}
+{% block title %}{{ _('First-time setup') }}{% endblock %}
+{% block side %}
+    <div>
+      <h2>{{ _('Set up the app in a few minutes.') }}</h2>
+      <p>{{ _('Everything can be changed later in Settings. Steps you skip can be finished any time.') }}</p>
+      <ol class="wizard-steps">
+        {% for key, title in WIZARD_STEPS %}
+        <li class="{{ 'done' if loop.index0 < current }} {{ 'current' if loop.index0 == current }}">
+          <span class="num">{% if loop.index0 < current %}{{ icon('check', 'sm') }}{% else %}{{ loop.index }}{% endif %}</span>
+          {{ _(title) }}
+        </li>
+        {% endfor %}
+      </ol>
+    </div>
+{% endblock %}
+{% block content %}
+<div class="auth-card wizard-card">
+  <div class="wizard-count">{{ _('Step {n} of {total}', n=current + 1, total=WIZARD_STEPS|length) }} · {{ _(WIZARD_STEPS[current][1]) }}</div>
+  <div class="wizard-bar"><span style="width:{{ ((current + 1) * 100 / WIZARD_STEPS|length)|round|int }}%"></span></div>
+  {% block wizard %}{% endblock %}
+</div>
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "setup/_layout.html" %}
+{% block wizard %}
+<h1>{{ _('Invoice numbers') }}</h1>
+<p class="sub">{{ _('Did the company issue e-invoices with another program this year? Enter the last number of each series and the app continues right after it.') }}</p>
+<form method="post">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  {% for kind, title, example in [('efatura', 'e-Fatura', 'EFT'), ('earsiv', 'e-Arşiv', 'ARS')] %}
+  <fieldset class="wizard-box">
+    <legend>{{ title }}</legend>
+    <div class="field"><label>{{ _('Last number issued by the previous program') }}</label>
+      <input type="text" name="{{ kind }}_last" value="{{ s.get(kind ~ '_last', '') }}" class="mono" placeholder="{{ _('e.g.') }} {{ s[kind ~ '_prefix'] }}{{ today().year }}000000057" style="text-transform:uppercase">
+      <div class="hint">{{ _('Leave empty if this is the first {kind} invoice this year.', kind=title) }}</div></div>
+    <details class="wizard-more">
+      <summary>{{ _('Series without a previous program') }}</summary>
+      <div class="form-row">
+        <div class="field"><label>{{ _('Series (3 letters)') }}</label><input type="text" name="{{ kind }}_prefix" value="{{ s[kind ~ '_prefix'] }}" maxlength="3" class="mono" style="text-transform:uppercase"></div>
+        <div class="field"><label>{{ _('First number') }}</label><input type="number" min="1" name="{{ kind }}_start" value="{{ s[kind ~ '_start'] }}"></div>
+      </div>
+      <div class="hint">{{ _('Use the series registered for the company at the integrator.') }}</div>
+    </details>
+  </fieldset>
+  {% endfor %}
+
+  <div class="field">
+    <label>{{ _('Default e-Fatura profile') }}</label>
+    <div class="option-cards">
+      <label class="option-card"><input type="radio" name="default_profile" value="TICARIFATURA" {{ 'checked' if s.default_profile != 'TEMELFATURA' }}>
+        <span><b>{{ _('Commercial invoice (TİCARİFATURA)') }}</b><p>{{ _('The customer can accept or reject the invoice within 8 days. Most companies use this.') }}</p></span></label>
+      <label class="option-card"><input type="radio" name="default_profile" value="TEMELFATURA" {{ 'checked' if s.default_profile == 'TEMELFATURA' }}>
+        <span><b>{{ _('Basic invoice (TEMELFATURA)') }}</b><p>{{ _('No acceptance step. Ask your accountant if unsure.') }}</p></span></label>
+    </div>
+  </div>
+
+  <div class="wizard-actions">
+    <a class="btn btn-ghost" href="{{ url_for('wizard.company') }}">{{ icon('undo', 'sm') }} {{ _('Back') }}</a>
+    <span class="spacer"></span>
+    <a class="btn btn-ghost" href="{{ url_for('wizard.efatura') }}">{{ _('Skip for now') }}</a>
+    <button class="btn btn-primary btn-lg">{{ _('Save and continue') }} {{ icon('chevron-right', 'sm') }}</button>
+  </div>
+</form>
+{% endblock %}
