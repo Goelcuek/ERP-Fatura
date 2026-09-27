@@ -765,6 +765,17 @@ TR = {
     "Address & contact": "Adres ve iletişim",
     "Website": "Web sitesi",
     "IBAN for payments": "Ödemeler için IBAN",
+    "Logo": "Logo",
+    "Shown in the app, on receipts and printouts, and inside every e-invoice your customers receive.":
+        "Uygulamada, fişlerde ve çıktılarda, ayrıca müşterilerinize giden her e-faturada görünür.",
+    "PNG or JPG, up to 300 KB. A wide logo on a transparent or white background works best.":
+        "PNG veya JPG, en fazla 300 KB. Şeffaf veya beyaz zeminli, yatay bir logo en iyi sonucu verir.",
+    "Remove logo": "Logoyu kaldır",
+    "Service & invoicing": "Servis ve faturalama",
+    "Write the full legal title exactly as registered with GİB, e.g. “… San. ve Tic. Ltd. Şti.”. The app shows a shorter name in the menu.":
+        "Tam ticari unvanı GİB kaydındaki gibi yazın, örn. “… San. ve Tic. Ltd. Şti.”. Menüde kısa ad gösterilir.",
+    "The logo must be smaller than 300 KB.": "Logo 300 KB'tan küçük olmalıdır.",
+    "The logo must be a PNG or JPG image.": "Logo PNG veya JPG resmi olmalıdır.",
     "Company details saved.": "Firma bilgileri kaydedildi.",
     "Invoicing": "Faturalama",
     "Numbering, defaults and printed texts.": "Numaralandırma, varsayılanlar ve basılı metinler.",

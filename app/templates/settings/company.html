@@ -3,12 +3,13 @@
 {% block heading %}{{ _('Settings') }}{% endblock %}
 {% block subheading %}{{ _('This information is printed on every invoice and receipt.') }}{% endblock %}
 {% block settings %}
-<form method="post" class="card">
+<form method="post" class="card" enctype="multipart/form-data">
   <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
   <div class="form-section">
     <div class="intro"><h3>{{ _('Legal identity') }}</h3><p>{{ _('Must match your GİB e-Fatura registration exactly.') }}</p></div>
     <div>
-      <div class="field"><label class="req">{{ _('Company title') }}</label><input type="text" name="name" value="{{ s.name }}"></div>
+      <div class="field"><label class="req">{{ _('Company title') }}</label><input type="text" name="name" value="{{ s.name }}">
+        <div class="hint">{{ _('Write the full legal title exactly as registered with GİB, e.g. “… San. ve Tic. Ltd. Şti.”. The app shows a shorter name in the menu.') }}</div></div>
       <div class="form-row">
         <div class="field"><label class="req">{{ _('VKN / TCKN') }}</label><input type="text" name="tax_id" value="{{ s.tax_id }}" inputmode="numeric" maxlength="11"></div>
         <div class="field"><label class="req">{{ _('Tax office') }}</label><input type="text" name="tax_office" value="{{ s.tax_office }}"></div>
@@ -33,6 +34,18 @@
         <div class="field"><label>{{ _('Website') }}</label><input type="text" name="website" value="{{ s.website }}"></div>
       </div>
       <div class="field"><label>{{ _('IBAN for payments') }}</label><input type="text" name="iban" value="{{ s.iban }}" class="mono"></div>
+    </div>
+  </div>
+  <div class="form-section">
+    <div class="intro"><h3>{{ _('Logo') }}</h3><p>{{ _('Shown in the app, on receipts and printouts, and inside every e-invoice your customers receive.') }}</p></div>
+    <div>
+      <div style="display:flex;gap:16px;align-items:center;margin-bottom:12px">
+        {% if has_logo %}<span class="logo-preview"><img src="{{ url_for('auth.logo') }}?v={{ range(100000)|random }}" alt=""></span>
+        {% else %}<span class="brand-mark mono-mark" style="width:56px;height:56px;font-size:20px;border-radius:14px">{{ brand_initials }}</span>{% endif %}
+        <div class="small muted">{{ _('PNG or JPG, up to 300 KB. A wide logo on a transparent or white background works best.') }}</div>
+      </div>
+      <div class="field"><input type="file" name="logo" accept="image/png,image/jpeg" class="input" style="padding:6px"></div>
+      {% if has_logo %}<label class="check"><input type="checkbox" name="remove_logo" value="1"><span>{{ _('Remove logo') }}</span></label>{% endif %}
     </div>
   </div>
   <div class="form-actions"><button class="btn btn-primary">{{ _('Save') }}</button></div>

@@ -50,7 +50,7 @@ def indirect_messages():
     pat = re.compile(r"""(?:raise \w+Error\(|errors\.append\(|message=)\s*f?(["'])(.+?)\1""")
     out = set()
     integ_dir = os.path.join(ROOT, "app", "services", "integrators")
-    rels = ["app/services/ubl.py", "app/services/invoicing.py", "app/services/backup.py"]
+    rels = ["app/services/ubl.py", "app/services/invoicing.py", "app/services/backup.py", "app/services/branding.py"]
     rels += [f"app/services/integrators/{f}" for f in sorted(os.listdir(integ_dir)) if f.endswith(".py")]
     for rel in rels:
         with open(os.path.join(ROOT, rel), encoding="utf-8") as fh:

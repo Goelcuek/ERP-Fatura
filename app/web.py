@@ -12,7 +12,7 @@ from .extensions import db
 from .i18n import _
 from .models import UNITS, Setting, User
 
-PUBLIC_ENDPOINTS = {"auth.login", "auth.setup", "static"}
+PUBLIC_ENDPOINTS = {"auth.login", "auth.setup", "auth.logo", "static"}
 
 
 def admin_required(fn):
@@ -225,7 +225,12 @@ def init_web(app):
 
     @app.context_processor
     def inject():
-        return {"company_name": Setting.get("company.name") or "Atölye"}
+        from .services import branding
+
+        name = branding.company_name()
+        short = branding.short_name()
+        return {"company_name": name, "brand_name": short, "brand_initials": branding.initials(short),
+                "has_logo": bool(branding.logo_path())}
 
     @app.after_request
     def security_headers(resp):

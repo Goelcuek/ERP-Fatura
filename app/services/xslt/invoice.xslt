@@ -66,7 +66,7 @@
       </head>
       <body>
         <table class="top"><tr>
-          <td><xsl:call-template name="party"><xsl:with-param name="p" select="cac:AccountingSupplierParty/cac:Party"/></xsl:call-template></td>
+          <td><!--LOGO--><xsl:call-template name="party"><xsl:with-param name="p" select="cac:AccountingSupplierParty/cac:Party"/></xsl:call-template></td>
           <td class="title">
             <xsl:choose>
               <xsl:when test="cbc:ProfileID = 'EARSIVFATURA'">e-ARŞİV FATURA</xsl:when>

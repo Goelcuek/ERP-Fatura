@@ -67,6 +67,9 @@ def create_app(test_config=None):
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
     )
+    from .services.branding import load_customer_preset
+
+    app.config["CUSTOMER"] = load_customer_preset(BASE_DIR)
     if test_config:
         app.config.update(test_config)
 

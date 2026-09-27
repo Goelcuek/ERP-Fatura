@@ -17,9 +17,23 @@ from .ubl import CAC, CBC
 XSLT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "xslt", "invoice.xslt")
 
 
+LOGO_MARKER = b"<!--LOGO-->"
+
+
 def default_xslt():
+    """The bundled display template, with the company logo baked in when one is set."""
     with open(XSLT_PATH, "rb") as fh:
-        return fh.read()
+        xslt = fh.read()
+    from flask import has_app_context
+
+    if has_app_context():
+        from .branding import logo_data_uri
+
+        uri = logo_data_uri()
+        if uri:
+            img = f'<img src="{uri}" alt="" style="max-height:70px;max-width:240px;display:block;margin-bottom:8px"/>'
+            xslt = xslt.replace(LOGO_MARKER, img.encode())
+    return xslt
 
 
 def children(root, tag):

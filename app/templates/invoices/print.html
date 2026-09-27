@@ -49,6 +49,7 @@
   {% if inv.is_draft %}<div class="draft-mark">{{ _('DRAFT') }}</div>{% endif %}
   <div class="top">
     <div class="co">
+      {% if has_logo %}<img src="{{ url_for('auth.logo') }}" alt="" style="max-height:60px;max-width:220px;display:block;margin-bottom:8px">{% endif %}
       <b>{{ company.name }}</b>
       <div>{{ company.address }}</div>
       <div>{{ company.district }} / {{ company.city }}</div>

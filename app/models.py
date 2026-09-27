@@ -64,6 +64,7 @@ class Setting(db.Model):
         "company.email": "",
         "company.website": "",
         "company.iban": "",
+        "company.logo": "",
         "invoice.efatura_prefix": "EFT",
         "invoice.earsiv_prefix": "ARS",
         "invoice.efatura_start": 1,  # first sequence number to use (continue from a previous system)

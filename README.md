@@ -54,6 +54,22 @@ docker compose up -d           # data is kept in ./data
 flask --app app seed-demo      # then log in with  demo / demo1234
 ```
 
+## This installation: Çağ-Tek Makina
+
+`customer.json` holds the defaults for this customer's installation:
+
+```json
+{ "company_name": "Çağ-Tek Makina", "short_name": "Çağ-Tek Makina" }
+```
+
+The first-run setup is pre-filled with the name, and the app, login screen, receipts and printouts show it (with an
+"ÇT" monogram until a logo is uploaded in **Settings → Company → Logo**). The uploaded logo is also embedded in the
+display template of every e-invoice, so Çağ-Tek's customers see it on the invoices they receive.
+
+Before issuing invoices, enter in **Settings → Company** the full legal title exactly as registered with GİB
+(e.g. "Çağ-Tek Makina San. ve Tic. Ltd. Şti." — the menu shows the short name automatically), VKN, tax office,
+address and IBAN. For another customer, edit `customer.json` (or point `ERP_CUSTOMER_FILE` at a different file).
+
 ## Where the data lives — and backing it up
 
 Everything the application stores is in **one folder** (`data/` next to the app, or `ERP_DATA_DIR`):

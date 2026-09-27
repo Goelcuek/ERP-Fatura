@@ -1,6 +1,6 @@
 from urllib.parse import urlparse
 
-from flask import Blueprint, flash, g, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, send_file, session, url_for
 
 from ..extensions import db
 from ..i18n import LANGUAGES, _
@@ -69,7 +69,19 @@ def setup():
         session["uid"] = user.id
         flash(_("Welcome! Complete your company details in Settings before issuing invoices."), "success")
         return redirect(url_for("dashboard.index"))
-    return render_template("auth/setup.html", form={})
+    return render_template("auth/setup.html", form={"name": current_app.config["CUSTOMER"].get("company_name", "")})
+
+
+@bp.route("/branding/logo")
+def logo():
+    from ..services.branding import logo_path
+
+    path = logo_path()
+    if not path:
+        abort(404)
+    resp = send_file(path, max_age=300)
+    resp.headers["Content-Security-Policy"] = "default-src 'none'"
+    return resp
 
 
 @bp.route("/profile", methods=["GET", "POST"])

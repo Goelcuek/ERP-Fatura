@@ -33,10 +33,25 @@ def company():
             if f == "tax_id":
                 v = "".join(ch for ch in v if ch.isdigit())
             Setting.set(f"company.{f}", v)
+        from ..services import branding
+
+        try:
+            upload = request.files.get("logo")
+            if upload and upload.filename:
+                branding.save_logo(upload.read())
+            elif request.form.get("remove_logo"):
+                branding.remove_logo()
+        except branding.BrandingError as e:
+            db.session.rollback()
+            flash(_(str(e)), "error")
+            return redirect(url_for("settings.company"))
         db.session.commit()
         flash(_("Company details saved."), "success")
         return redirect(url_for("settings.company"))
-    return render_template("settings/company.html", s=Setting.group("company"), section="company")
+    s = Setting.group("company")
+    if not s.get("name"):
+        s["name"] = current_app.config["CUSTOMER"].get("company_name", "")
+    return render_template("settings/company.html", s=s, section="company")
 
 
 @bp.route("/invoicing", methods=["GET", "POST"])

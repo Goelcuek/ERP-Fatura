@@ -3,7 +3,7 @@
 {% block content %}
 <div class="auth-card">
   <h1>{{ _('Sign in') }}</h1>
-  <p class="sub">{{ _('Welcome back. Enter your details to continue.') }}</p>
+  <p class="sub">{{ company_name }} — {{ _('Welcome back. Enter your details to continue.') }}</p>
   <form method="post">
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <div class="field">

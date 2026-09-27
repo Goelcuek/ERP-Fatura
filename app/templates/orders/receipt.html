@@ -39,7 +39,8 @@
 <div class="sheet">
   <div class="head">
     <div class="co">
-      <b>{{ company.name or 'Atölye' }}</b>
+      {% if has_logo %}<img src="{{ url_for('auth.logo') }}" alt="" style="max-height:48px;max-width:180px;display:block;margin-bottom:6px">{% endif %}
+      <b>{{ company.name or company_name }}</b>
       <div>{{ company.address }}{% if company.district or company.city %}, {{ company.district }} / {{ company.city }}{% endif %}</div>
       <div>{{ company.phone }}{% if company.email %} · {{ company.email }}{% endif %}</div>
     </div>
