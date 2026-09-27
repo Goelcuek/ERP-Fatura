@@ -78,6 +78,18 @@ class Setting(db.Model):
         "ürünlerden firmamız sorumlu değildir. Onarım garantisi değiştirilen parçalar için 6 aydır.",
         "integrator.name": "mock",
         "integrator.config": {},
+        "assistant.enabled": True,
+        "assistant.use_llm": True,
+        "assistant.base_url": "http://127.0.0.1:11434/v1",
+        "assistant.model": "qwen3.5:2b",
+        "assistant.api_key": "",
+        "assistant.temperature": 0.2,
+        "assistant.timeout": 120,
+        "voice.engine": "auto",  # auto | browser | local | off
+        "voice.lang": "tr-TR",
+        "voice.whisper_model": "small",
+        "voice.speak_replies": False,
+        "voice.auto_send": True,
         "backup.enabled": True,
         "backup.interval_hours": 24,
         "backup.keep": 30,
@@ -322,6 +334,7 @@ class ServiceOrderEvent(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"))
     kind = db.Column(db.String(20), nullable=False, default="note")  # status | note
     message = db.Column(db.Text, nullable=False, default="")
+    source = db.Column(db.String(12), nullable=False, default="web")  # web | assistant
 
     user = db.relationship("User")
 
@@ -456,6 +469,7 @@ class InvoiceEvent(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"))
     kind = db.Column(db.String(20), nullable=False, default="info")  # info | success | error
     message = db.Column(db.Text, nullable=False, default="")
+    source = db.Column(db.String(12), nullable=False, default="web")  # web | assistant
 
 
 # ---------------------------------------------------------------- bookkeeping
@@ -548,3 +562,25 @@ class Expense(db.Model):
     @property
     def paid_amount(self):
         return sum((t.amount for t in self.payments), ZERO)
+
+
+# ---------------------------------------------------------------- assistant
+
+
+class AssistantConversation(db.Model):
+    """One chat with the in-app assistant. `messages` is the model-facing history,
+    `display` what the chat panel shows, `pending` actions waiting for the user's decision."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    messages = db.Column(db.Text, nullable=False, default="[]")
+    display = db.Column(db.Text, nullable=False, default="[]")
+    pending = db.Column(db.Text, nullable=False, default="null")
+    created_at = db.Column(db.DateTime, nullable=False, default=now)
+    updated_at = db.Column(db.DateTime, nullable=False, default=now, onupdate=now)
+
+    def get(self, field):
+        return json.loads(getattr(self, field))
+
+    def put(self, field, value):
+        setattr(self, field, json.dumps(value, ensure_ascii=False, default=str))

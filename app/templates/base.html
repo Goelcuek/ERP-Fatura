@@ -11,7 +11,7 @@
   </script>
   <meta name="csrf-token" content="{{ csrf_token() }}">
 </head>
-<body>
+<body data-endpoint="{{ request.endpoint or '' }}" data-view-args='{{ (request.view_args or {})|tojson }}'>
 {% include "partials/icons.html" %}
 {% set ep = request.endpoint or "" %}
 <div class="app">
@@ -25,6 +25,7 @@
     </a>
     <nav class="nav">
       <a href="{{ url_for('dashboard.index') }}" class="{{ 'active' if ep == 'dashboard.index' }}">{{ icon('home') }} {{ _('Dashboard') }}</a>
+      {% if assistant_enabled %}<a href="{{ url_for('assistant.page') }}" class="{{ 'active' if ep.startswith('assistant.') }}">{{ icon('sparkle') }} {{ _('Assistant') }}</a>{% endif %}
       <div class="nav-label">{{ _('Workshop') }}</div>
       <a href="{{ url_for('orders.index') }}" class="{{ 'active' if ep.startswith('orders.') }}">{{ icon('wrench') }} {{ _('Service orders') }}</a>
       <a href="{{ url_for('contacts.index') }}" class="{{ 'active' if ep.startswith('contacts.') }}">{{ icon('users') }} {{ _('Customers') }}</a>
@@ -85,7 +86,9 @@
     </div>
   {% endfor %}
 </div>
+{% if assistant_enabled and request.endpoint != 'assistant.page' %}{% with page_mode=False %}{% include "partials/assistant.html" %}{% endwith %}{% endif %}
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% if assistant_enabled %}<script src="{{ url_for('static', filename='js/assistant.js') }}"></script>{% endif %}
 {% block scripts %}{% endblock %}
 </body>
 </html>

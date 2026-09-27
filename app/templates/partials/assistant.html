@@ -1,0 +1,49 @@
+{# In-app assistant: floating button + chat panel. The same component renders full-page on /assistant. #}
+<div class="asst {{ 'asst-page' if page_mode else 'asst-float' }}" data-assistant data-mode="{{ 'page' if page_mode else 'float' }}"
+     data-api="{{ url_for('assistant.page') }}api">
+  {% if not page_mode %}
+  <button type="button" class="asst-fab" data-asst-open aria-label="{{ _('Assistant') }}">
+    {{ icon('mic') }}<span>{{ _('Assistant') }}</span>
+  </button>
+  {% endif %}
+  <section class="asst-panel {{ '' if page_mode else 'hidden' }}" data-asst-panel aria-label="{{ _('Assistant') }}">
+    <header class="asst-head">
+      <span class="asst-avatar">{{ icon('sparkle') }}</span>
+      <div class="grow"><b>{{ _('Assistant') }}</b><div class="small muted" data-asst-status>{{ _('Type or speak a request') }}</div></div>
+      <button type="button" class="icon-btn" data-asst-speak title="{{ _('Read replies aloud') }}">{{ icon('volume') }}</button>
+      <button type="button" class="icon-btn" data-asst-new title="{{ _('New conversation') }}">{{ icon('refresh') }}</button>
+      {% if not page_mode %}<button type="button" class="icon-btn" data-asst-close title="{{ _('Close') }}">{{ icon('x') }}</button>{% endif %}
+    </header>
+    <div class="asst-log" data-asst-log>
+      <div class="asst-hello" data-asst-hello>
+        <p><b>{{ _('Hello! How can I help?') }}</b></p>
+        <p class="small muted">{{ _('Examples:') }}</p>
+        <div class="asst-examples">
+          {% for ex in [_('I finished this job'), _('SRV-2026-00012 is waiting for parts'), _('Add note: customer will pick up on Friday'), _('Which jobs are due today?'), _('How much does Yıldız İnşaat owe?')] %}
+          <button type="button" class="asst-chip" data-asst-example>{{ ex }}</button>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="asst-pending" data-asst-pending></div>
+    <form class="asst-input" data-asst-form>
+      <button type="button" class="asst-mic" data-asst-mic title="{{ _('Hold to talk') }}" aria-label="{{ _('Speak') }}">{{ icon('mic') }}</button>
+      <textarea rows="1" data-asst-text placeholder="{{ _('Type a message…') }}" aria-label="{{ _('Message') }}"></textarea>
+      <button class="asst-send" aria-label="{{ _('Send') }}">{{ icon('send') }}</button>
+    </form>
+  </section>
+  <template data-asst-strings>{{ {
+    'listening': _('Listening… tap the microphone again when you are done.'),
+    'thinking': _('Working on it…'),
+    'transcribing': _('Recognising speech…'),
+    'ready': _('Type or speak a request'),
+    'confirm': _('Confirm'),
+    'decline': _('Cancel'),
+    'undo': _('Undo'),
+    'undone': _('Undone'),
+    'no_mic': _('Voice input is not available in this browser. Use Chrome or Edge, or type your message.'),
+    'need_https': _('The microphone needs a secure (https) connection. Open the app from this computer, or start it with --https.'),
+    'mic_denied': _('Microphone access was denied.'),
+    'error': _('Something went wrong. Please try again.'),
+  }|tojson }}</template>
+</div>

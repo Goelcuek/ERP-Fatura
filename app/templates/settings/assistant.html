@@ -1,0 +1,68 @@
+{% extends "settings/_layout.html" %}
+{% block title %}{{ _('Assistant') }}{% endblock %}
+{% block heading %}{{ _('Settings') }}{% endblock %}
+{% block subheading %}{{ _('The assistant runs on this computer: no subscription, no cost per use, and your data stays in the shop.') }}{% endblock %}
+{% block settings %}
+<div class="alert alert-info" style="margin-bottom:16px">{{ icon('info') }}<div class="body"><b>{{ _('How it works') }}</b>
+  <p>{{ _('Common workshop commands (“I finished this job”, “SRV-2026-00012 is waiting for parts”, “add note: …”) are understood directly by the app — instantly, and they work even without an AI model.') }}</p>
+  <p>{{ _('Everything else (questions, lookups, opening orders, invoices) goes to a local AI model such as Qwen running in Ollama on this computer. Invoices, payments, expenses and stock changes always ask for confirmation.') }}</p></div></div>
+
+<form method="post" class="card">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <div class="form-section">
+    <div class="intro"><h3>{{ _('Assistant') }}</h3></div>
+    <div>
+      <label class="check"><input type="checkbox" name="enabled" value="1" {{ 'checked' if s.enabled }}><span>{{ _('Show the assistant in the app') }}</span></label>
+      <label class="check"><input type="checkbox" name="use_llm" value="1" {{ 'checked' if s.use_llm }}>
+        <span>{{ _('Use the local AI model for other requests') }}<small>{{ _('Off: only the built-in workshop commands are available.') }}</small></span></label>
+    </div>
+  </div>
+  <div class="form-section">
+    <div class="intro"><h3>{{ _('Local AI model') }}</h3><p>{{ _('Any server with an OpenAI-compatible API works: Ollama, llama.cpp, LM Studio.') }}</p></div>
+    <div>
+      <div class="form-row">
+        <div class="field"><label>{{ _('Model server address') }}</label><input type="text" name="base_url" value="{{ s.base_url }}" class="mono">
+          <div class="hint">Ollama: http://127.0.0.1:11434/v1 · LM Studio: http://127.0.0.1:1234/v1 · llama.cpp: http://127.0.0.1:8080/v1</div></div>
+        <div class="field"><label>{{ _('Model name') }}</label><input type="text" name="model" value="{{ s.model }}" class="mono">
+          <div class="hint">{{ _('Exactly as listed by the server, e.g. the output of “ollama list”.') }}</div></div>
+        <div class="field"><label>{{ _('Creativity (temperature)') }}</label><input type="number" step="0.1" min="0" max="1.5" name="temperature" value="{{ s.temperature }}">
+          <div class="hint">{{ _('Keep low (0–0.3) for reliable actions.') }}</div></div>
+        <div class="field"><label>{{ _('Time limit per answer (seconds)') }}</label><input type="number" min="10" name="timeout" value="{{ s.timeout }}"></div>
+        <div class="field span-2"><label>{{ _('API key (optional)') }}</label><input type="password" name="api_key" autocomplete="off" placeholder="{{ '••••••••  ' ~ _('(saved — leave empty to keep)') if s.api_key else _('Not needed for Ollama') }}"></div>
+      </div>
+      <details class="small" style="margin-top:4px"><summary style="cursor:pointer;color:var(--accent);font-weight:600">{{ _('Setting up Ollama (one time)') }}</summary>
+        <ol style="margin:10px 0 0;padding-left:18px;line-height:1.8">
+          <li>{{ _('Download and install Ollama from ollama.com (Windows, macOS, Linux).') }}</li>
+          <li>{{ _('Open a terminal and download the model:') }} <code>ollama pull {{ s.model }}</code></li>
+          <li>{{ _('Press “Save & test” below. Ollama starts automatically with Windows.') }}</li>
+        </ol>
+        <p class="muted" style="margin-top:8px">{{ _('A 2B model needs about 3 GB of free memory and runs on the processor; a graphics card makes it faster but is not required. Larger models (4B–8B) understand better but answer more slowly.') }}</p>
+      </details>
+    </div>
+  </div>
+  <div class="form-section">
+    <div class="intro"><h3>{{ _('Voice') }}</h3><p>{{ _('Technicians can tap the microphone and speak instead of typing.') }}</p></div>
+    <div>
+      <div class="form-row">
+        <div class="field"><label>{{ _('Speech recognition') }}</label>
+          <select name="voice_engine">
+            {% for k, label in [('auto', _('Automatic')), ('local', _('On this computer (Whisper, offline)')), ('browser', _('Browser (Chrome/Edge, needs internet)')), ('off', _('Off'))] %}
+            <option value="{{ k }}" {{ 'selected' if v.engine == k }}>{{ label }}</option>{% endfor %}
+          </select>
+          <div class="hint">{% if whisper %}<span class="pos">{{ _('Offline Whisper is installed.') }}</span>{% else %}{{ _('Offline Whisper is not installed: pip install -r requirements-voice.txt') }}{% endif %}</div></div>
+        <div class="field"><label>{{ _('Language') }}</label>
+          <select name="voice_lang">{% for k, label in [('tr-TR', 'Türkçe'), ('en-US', 'English')] %}<option value="{{ k }}" {{ 'selected' if v.lang == k }}>{{ label }}</option>{% endfor %}</select></div>
+        <div class="field"><label>{{ _('Whisper model') }}</label>
+          <select name="whisper_model">{% for k, label in [('base', _('base — fastest')), ('small', _('small — recommended')), ('medium', _('medium — most accurate, slow'))] %}<option value="{{ k }}" {{ 'selected' if v.whisper_model == k }}>{{ label }}</option>{% endfor %}</select></div>
+      </div>
+      <label class="check"><input type="checkbox" name="auto_send" value="1" {{ 'checked' if v.auto_send }}><span>{{ _('Send automatically when the speaker stops') }}</span></label>
+      <label class="check"><input type="checkbox" name="speak_replies" value="1" {{ 'checked' if v.speak_replies }}><span>{{ _('Read replies aloud by default') }}<small>{{ _('Each user can switch this on or off in the assistant panel.') }}</small></span></label>
+      <div class="alert alert-warning" style="margin-top:8px">{{ icon('warning') }}<div class="body">{{ _('Phones and tablets only allow the microphone on secure connections. Start the app with “python run.py --https” and accept the certificate warning once on each device.') }}</div></div>
+    </div>
+  </div>
+  <div class="form-actions">
+    <button class="btn" name="test" value="1">{{ icon('plug') }} {{ _('Save & test') }}</button>
+    <button class="btn btn-primary">{{ _('Save') }}</button>
+  </div>
+</form>
+{% endblock %}

@@ -4,3 +4,5 @@ SQLAlchemy>=2.0,<3
 lxml>=5.0
 requests>=2.31
 waitress>=3.0
+cheroot>=10.0
+cryptography>=42.0

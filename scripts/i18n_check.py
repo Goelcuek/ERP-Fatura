@@ -35,6 +35,9 @@ def extract():
     found.update(CAPABILITIES.values())
     found.update(XmlOptions.LABELS.values())
     found.update(["Test", "Production"])
+    from app.services.assistant.agent import NOT_UNDERSTOOD
+
+    found.add(NOT_UNDERSTOOD)
     for cls in REGISTRY.values():
         found.update([cls.label, cls.description])
         for f in cls.fields:
@@ -47,11 +50,15 @@ def extract():
 
 def indirect_messages():
     """Messages raised as exceptions and translated where they are displayed."""
-    pat = re.compile(r"""(?:raise \w+Error\(|errors\.append\(|message=)\s*f?(["'])(.+?)\1""")
+    # ToolError messages go to the language model only, never to the user
+    pat = re.compile(r"""(?:raise (?!ToolError)\w+Error\(|errors\.append\(|message=)\s*f?(["'])(.+?)\1""")
     out = set()
     integ_dir = os.path.join(ROOT, "app", "services", "integrators")
-    rels = ["app/services/ubl.py", "app/services/invoicing.py", "app/services/backup.py", "app/services/branding.py"]
+    rels = ["app/services/ubl.py", "app/services/invoicing.py", "app/services/backup.py", "app/services/branding.py",
+            "app/services/workshop.py"]
     rels += [f"app/services/integrators/{f}" for f in sorted(os.listdir(integ_dir)) if f.endswith(".py")]
+    asst_dir = os.path.join(ROOT, "app", "services", "assistant")
+    rels += [f"app/services/assistant/{f}" for f in sorted(os.listdir(asst_dir)) if f.endswith(".py")]
     for rel in rels:
         with open(os.path.join(ROOT, rel), encoding="utf-8") as fh:
             for line in fh:

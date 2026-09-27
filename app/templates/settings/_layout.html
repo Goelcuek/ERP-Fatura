@@ -6,6 +6,7 @@
     <a href="{{ url_for('settings.company') }}" class="{{ 'active' if section == 'company' }}">{{ icon('building') }} {{ _('Company') }}</a>
     <a href="{{ url_for('settings.invoicing') }}" class="{{ 'active' if section == 'invoicing' }}">{{ icon('file') }} {{ _('Invoicing') }}</a>
     <a href="{{ url_for('settings.integrator') }}" class="{{ 'active' if section == 'integrator' }}">{{ icon('plug') }} {{ _('e-Invoice integrator') }}</a>
+    <a href="{{ url_for('settings.assistant') }}" class="{{ 'active' if section == 'assistant' }}">{{ icon('sparkle') }} {{ _('Assistant') }}</a>
     <a href="{{ url_for('settings.users') }}" class="{{ 'active' if section == 'users' }}">{{ icon('users') }} {{ _('Users') }}</a>
     <a href="{{ url_for('settings.backup') }}" class="{{ 'active' if section == 'backup' }}">{{ icon('database') }} {{ _('Backups') }}</a>
   </nav>

@@ -96,7 +96,7 @@
             {% else %}
               <div class="what">{{ e.message }}</div>
             {% endif %}
-            <div class="when">{{ e.at|dt }}{% if e.user %} · {{ e.user.full_name or e.user.username }}{% endif %}</div>
+            <div class="when">{{ e.at|dt }}{% if e.user %} · {{ e.user.full_name or e.user.username }}{% endif %}{% if e.source == 'assistant' %} · <span class="tag blue">{{ icon('sparkle', 'sm') }} {{ _('via assistant') }}</span>{% endif %}</div>
           </li>
           {% endfor %}
         </ul>

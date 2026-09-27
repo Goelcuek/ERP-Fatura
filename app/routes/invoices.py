@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date
 
 from flask import Blueprint, Response, abort, flash, g, redirect, render_template, request, url_for
 from sqlalchemy import or_
@@ -15,9 +15,8 @@ from ..models import (
     InvoiceLine,
     Product,
     Setting,
-    Transaction,
 )
-from ..services import invoicing
+from ..services import invoicing, workshop
 from ..services.invoicing import InvoiceError
 from ..services.words import amount_in_words
 from . import Pager, f_date, f_dec, f_int, f_str, parse_lines, q_date
@@ -32,29 +31,8 @@ def _get(iid):
     return inv
 
 
-def default_profile_for(contact):
-    if contact is not None and contact.efatura_user:
-        return Setting.get("invoice.default_profile") or "TICARIFATURA"
-    return "EARSIVFATURA"
-
-
 def new_invoice_for(contact):
-    due_days = int(Setting.get("invoice.default_due_days") or 0)
-    inv = Invoice(
-        contact=contact,
-        profile=default_profile_for(contact),
-        type_code="SATIS",
-        issue_date=date.today(),
-        due_date=date.today() + timedelta(days=due_days) if due_days else None,
-        created_by_id=g.user.id,
-        notes="",
-    )
-    db.session.add(inv)
-    if contact is not None and contact.withholding_buyer:
-        inv.type_code = "TEVKIFAT"
-        inv.withholding_code = "603"
-        inv.withholding_rate = WITHHOLDING_CODES["603"][1]
-    return inv
+    return workshop.new_invoice_for(contact, g.user)
 
 
 def _flash_errors(e):
@@ -289,18 +267,12 @@ def make_return(iid):
 @bp.route("/<int:iid>/pay", methods=["POST"])
 def pay(iid):
     inv = _get(iid)
-    acct = db.session.get(Account, f_int("account_id") or 0)
-    amount = f_dec("amount")
-    if acct is None or amount <= 0:
-        flash(_("Choose an account and a positive amount."), "error")
+    try:
+        workshop.record_invoice_payment(inv, db.session.get(Account, f_int("account_id") or 0), f_dec("amount"),
+                                        g.user, on=f_date("date", date.today()))
+    except workshop.WorkshopError as e:
+        flash(_(str(e)), "error")
         return redirect(url_for("invoices.view", iid=inv.id))
-    direction = "out" if inv.type_code == "IADE" else "in"
-    db.session.add(Transaction(
-        date=f_date("date", date.today()), account=acct, direction=direction, amount=amount,
-        kind="collection" if direction == "in" else "payment", contact_id=inv.contact_id, invoice_id=inv.id,
-        description=f"{inv.number}", category=_("Sales"), created_by_id=g.user.id,
-    ))
-    inv.log("success", _("Payment recorded: {amt} → {acct}", amt=f"{amount:.2f}", acct=acct.name), g.user.id)
     db.session.commit()
     flash(_("Payment recorded."), "success")
     return redirect(url_for("invoices.view", iid=inv.id))

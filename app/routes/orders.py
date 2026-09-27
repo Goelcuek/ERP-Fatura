@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 
 from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
 from sqlalchemy import func, or_
@@ -7,7 +7,6 @@ from ..extensions import db
 from ..i18n import _
 from ..models import (
     Contact,
-    InvoiceLine,
     Product,
     ServiceOrder,
     ServiceOrderEvent,
@@ -16,6 +15,7 @@ from ..models import (
     User,
 )
 from ..web import STATUS_LABELS
+from ..services import workshop
 from . import Pager, f_bool, f_date, f_dec, f_int, f_str, parse_lines
 
 bp = Blueprint("orders", __name__, url_prefix="/service")
@@ -26,14 +26,6 @@ def _get(oid):
     if o is None:
         abort(404)
     return o
-
-
-def next_order_number():
-    prefix = (Setting.get("orders.prefix") or "SRV").upper()
-    stem = f"{prefix}-{date.today().year}-"
-    last = db.session.query(func.max(ServiceOrder.number)).filter(ServiceOrder.number.like(stem + "%")).scalar()
-    seq = int(last[len(stem):]) + 1 if last else 1
-    return f"{stem}{seq:05d}"
 
 
 def _fill(o):
@@ -81,11 +73,10 @@ def new():
             if not (o.device_type or o.brand or o.model):
                 flash(_("Describe the device (type, brand or model)."), "error")
             else:
-                o.number = next_order_number()
-                db.session.add(o)
-                o.contact = contact
-                o.status = "received"
-                o.events.append(ServiceOrderEvent(kind="status", message="received", user_id=g.user.id))
+                fields = {k: getattr(o, k) for k in (
+                    "device_type", "brand", "model", "serial_no", "accessories", "complaint", "diagnosis", "work_done",
+                    "internal_notes", "priority", "promised_date", "under_warranty", "estimate", "technician_id")}
+                o = workshop.create_order(contact, g.user, **fields)
                 db.session.commit()
                 flash(_("Service order {n} created.", n=o.number), "success")
                 if request.form.get("print"):
@@ -135,14 +126,7 @@ def status(oid):
     new_status = f_str("status")
     if new_status not in ServiceOrder.STATUSES or new_status == o.status:
         return redirect(url_for("orders.view", oid=o.id))
-    note = f_str("note")
-    o.status = new_status
-    if new_status == "delivered":
-        o.delivered_at = datetime.now().replace(microsecond=0)
-    if new_status == "awaiting_approval":
-        o.customer_approved = None
-    o.events.insert(0, ServiceOrderEvent(kind="status", message=new_status + (f"|{note}" if note else ""),
-                                         user_id=g.user.id))
+    workshop.change_status(o, new_status, g.user, note=f_str("note"))
     db.session.commit()
     flash(_("Status changed to “{s}”.", s=_(STATUS_LABELS[new_status])), "success")
     return redirect(url_for("orders.view", oid=o.id))
@@ -190,26 +174,11 @@ def make_invoice(oid):
     o = _get(oid)
     if o.invoice_id and o.invoice and o.invoice.status != "cancelled":
         return redirect(url_for("invoices.view", iid=o.invoice_id))
-    if not o.lines:
-        flash(_("Add parts or labour before creating an invoice."), "error")
+    try:
+        inv, _created = workshop.draft_invoice_from_order(o, g.user)
+    except workshop.WorkshopError as e:
+        flash(_(str(e)), "error")
         return redirect(url_for("orders.view", oid=o.id))
-    from .invoices import new_invoice_for
-
-    inv = new_invoice_for(o.contact)
-    inv.lines = [
-        InvoiceLine(position=i, product=l.product, description=l.description, qty=l.qty, unit=l.unit,
-                    unit_price=l.unit_price, discount_rate=l.discount_rate, vat_rate=l.vat_rate)
-        for i, l in enumerate(o.lines)
-    ]
-    extra = " ".join(p for p in [o.device_type, o.brand, o.model] if p)
-    if o.serial_no:
-        extra += f" · S/N {o.serial_no}"
-    inv.notes = f"{extra}".strip()
-    inv.recompute()
-    db.session.add(inv)
-    db.session.flush()
-    o.invoice_id = inv.id
-    o.events.insert(0, ServiceOrderEvent(kind="note", message=_("Draft invoice created."), user_id=g.user.id))
     db.session.commit()
     flash(_("Draft invoice created. Review it and issue when ready."), "success")
     return redirect(url_for("invoices.edit", iid=inv.id))

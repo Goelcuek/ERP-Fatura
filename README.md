@@ -15,6 +15,8 @@ A self-hosted web application for a medium-sized **power-tool repair workshop** 
   warnings.
 - **Backups**: everything is one folder. One-click and automatic backups to a zip file, a second copy to a
   USB/NAS/OneDrive folder, and a one-step restore.
+- **Assistant with voice**: technicians say "bu işi bitirdim" and the job is updated; other questions go to a free
+  local AI model (Qwen via Ollama). Invoices and payments always ask for confirmation.
 - Turkish UI (English available per user), light & dark theme, works on phones and tablets in the workshop.
 
 | Dashboard | Service order |
@@ -178,6 +180,58 @@ class MyIntegrator(Integrator):
 `soap.py` provides envelope / WS-Security / fault helpers; `self.soap_call(...)` handles transport and logging.
 Settings and translations pick the new adapter up automatically (add its strings to `translations_tr.py`).
 
+## Assistant (text and voice) — runs locally, free
+
+Every page has an **Asistan** button (and there is a full-screen *Asistan* page for a workshop tablet). Staff type or
+speak; technicians can just say *"bu işi bitirdim"* and the job is updated.
+
+**How requests are handled**
+
+1. **Built-in workshop commands (no AI needed).** Status updates and notes are understood directly by the app —
+   instantly, predictably, even with no model installed:
+
+   | Say or type | Result |
+   |---|---|
+   | "Bu işi bitirdim, kömürleri değiştirdim" | the job on screen → *Teslime hazır*, "Kömürleri değiştirdim" saved as work done |
+   | "SRV-2026-00240 hazır" / "240 numaralı iş parça bekliyor" | that job → ready / awaiting parts |
+   | "Onarıma başladım", "Müşteri onayladı", "Teklif verdim", "Teslim ettim" | in repair / approved / awaiting approval / delivered |
+   | "Not ekle: müşteri cuma alacak" | note in the job's activity log |
+
+   "This job" means the job open on screen; otherwise the technician's own open job. If several could match, the
+   assistant shows them as buttons to tap. Every change has an **Undo** button and is logged as done via the assistant.
+   Questions ("240 hazır mı?") and negations ("hazır değil") are never treated as commands.
+
+2. **Local AI model for everything else** — questions ("Yıldız İnşaat'ın borcu ne kadar?", "Bugün hangi işler
+   teslim edilecek?"), opening orders, adding parts, draft invoices. The model calls the app's tools
+   (`app/services/assistant/tools.py`); lookups and workshop updates run directly, while **sending invoices to GİB,
+   payments, expenses, stock corrections and new customers always show a Confirm button** first. Cancelling a job
+   also asks for confirmation.
+
+**Setting up the local model (one time, no cost):**
+
+1. Install [Ollama](https://ollama.com) on the shop PC.
+2. `ollama pull qwen3.5:2b` (use the exact tag Ollama lists; `ollama list` shows installed models).
+3. Settings → Assistant → *Save & test*. Defaults: server `http://127.0.0.1:11434/v1`, model `qwen3.5:2b`.
+
+Any OpenAI-compatible local server works instead of Ollama (llama.cpp `llama-server`, LM Studio). A 2B model needs
+about 3 GB of free RAM and runs on the CPU. **Expectations:** a 2B model is fast and free, but it will sometimes
+misunderstand longer or unusual Turkish requests or pick the wrong tool — that is why everyday commands don't depend
+on it and why risky actions need confirmation. If the PC has 8 GB+ RAM to spare, a 4B model understands noticeably
+better; change the model name in Settings.
+
+**Voice**
+
+- *Browser* (default when nothing else is installed): Chrome/Edge speech recognition — nothing to install, but the
+  audio is processed by Google/Microsoft and needs internet.
+- *On this computer (Whisper, offline)*: `pip install -r requirements-voice.txt`; the Whisper model (~470 MB for
+  "small") downloads once into `data/models`, then speech never leaves the shop. Chosen automatically when installed.
+- Replies can be read aloud (speaker button in the panel).
+- **Phones and tablets only allow the microphone on https.** Start with `python run.py --https` (port 8443): a
+  certificate for this PC's name and LAN address is created in `data/tls/`; accept the browser warning once per
+  device. On the shop PC itself `http://127.0.0.1` works without it.
+
+The assistant can be switched off, or limited to the built-in commands, in Settings → Assistant.
+
 ## Accounting scope
 
 This is **pre-accounting (ön muhasebe)**: it tracks sales, purchases, receivables, payables, cash and bank, and
@@ -215,6 +269,8 @@ app/
   services/integrators/     # integrator adapters + SOAP helpers
   services/ubl_profile.py   # per-integrator XML adaptation, XSLT embedding and rendering
   services/backup.py        # backup / restore / scheduler
+  services/workshop.py      # business operations shared by pages and the assistant
+  services/assistant/       # command parser, local model client, tools, conversation logic, speech
   routes/                   # Flask blueprints
   templates/, static/       # server-rendered UI, no build step, no CDN (works offline)
   translations_tr.py        # Turkish UI strings

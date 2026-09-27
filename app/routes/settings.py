@@ -133,6 +133,39 @@ def integrator():
                            xml_labels=XmlOptions.LABELS, capabilities=CAPABILITIES, section="integrator")
 
 
+@bp.route("/assistant", methods=["GET", "POST"])
+def assistant():
+    from ..services.assistant import agent, speech
+
+    if request.method == "POST":
+        Setting.set("assistant.enabled", f_bool("enabled"))
+        Setting.set("assistant.use_llm", f_bool("use_llm"))
+        Setting.set("assistant.base_url", f_str("base_url") or Setting.DEFAULTS["assistant.base_url"])
+        Setting.set("assistant.model", f_str("model") or Setting.DEFAULTS["assistant.model"])
+        if request.form.get("api_key"):
+            Setting.set("assistant.api_key", f_str("api_key"))
+        try:
+            Setting.set("assistant.temperature", min(max(float(f_str("temperature") or 0.2), 0.0), 1.5))
+        except ValueError:
+            pass
+        Setting.set("assistant.timeout", max(10, f_int("timeout", 120)))
+        Setting.set("voice.engine", f_str("voice_engine") if f_str("voice_engine") in ("auto", "browser", "local", "off")
+                    else "auto")
+        Setting.set("voice.lang", f_str("voice_lang") or "tr-TR")
+        Setting.set("voice.whisper_model", f_str("whisper_model") or "small")
+        Setting.set("voice.speak_replies", f_bool("speak_replies"))
+        Setting.set("voice.auto_send", f_bool("auto_send"))
+        db.session.commit()
+        if request.form.get("test") == "1":
+            ok, msg = agent.health()
+            flash(_(msg) if ok else _("Connection failed: {err}", err=_(msg)), "success" if ok else "error")
+        else:
+            flash(_("Settings saved."), "success")
+        return redirect(url_for("settings.assistant"))
+    return render_template("settings/assistant.html", s=Setting.group("assistant"), v=Setting.group("voice"),
+                           whisper=speech.available(), section="assistant")
+
+
 @bp.route("/users")
 def users():
     return render_template("settings/users.html", users=User.query.order_by(User.full_name).all(), section="users")
