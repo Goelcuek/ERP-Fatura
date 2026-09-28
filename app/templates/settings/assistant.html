@@ -5,7 +5,7 @@
 {% block settings %}
 <div class="alert alert-info" style="margin-bottom:16px">{{ icon('info') }}<div class="body"><b>{{ _('How it works') }}</b>
   <p>{{ _('Common workshop commands (“I finished this job”, “SRV-2026-00012 is waiting for parts”, “add note: …”) are understood directly by the app — instantly, and they work even without an AI model.') }}</p>
-  <p>{{ _('Everything else (questions, lookups, opening orders, invoices) goes to a local AI model such as Qwen running in Ollama on this computer. Invoices, payments, expenses and stock changes always ask for confirmation.') }}</p></div></div>
+  <p>{{ _('Everything else (questions, lookups, opening orders, invoices) goes to a local AI model such as Gemma running in Ollama on this computer. Invoices, payments, expenses and stock changes always ask for confirmation.') }}</p></div></div>
 
 <form method="post" class="card">
   <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
@@ -42,7 +42,7 @@
         <div class="field"><label>{{ _('Model server address') }}</label><input type="text" name="base_url" value="{{ s.base_url }}" class="mono">
           <div class="hint">Ollama: http://127.0.0.1:11434/v1 · LM Studio: http://127.0.0.1:1234/v1 · llama.cpp: http://127.0.0.1:8080/v1</div></div>
         <div class="field"><label>{{ _('Model name') }}</label><input type="text" name="model" value="{{ s.model }}" class="mono">
-          <div class="hint">{{ _('Ollama model name, e.g. qwen3.5:2b. Changing it downloads the new model.') }}</div></div>
+          <div class="hint">{{ _('Ollama model name, e.g. gemma4:e2b or qwen3.5:2b. Changing it downloads the new model.') }}</div></div>
         <div class="field"><label>{{ _('Creativity (temperature)') }}</label><input type="number" step="0.1" min="0" max="1.5" name="temperature" value="{{ s.temperature }}">
           <div class="hint">{{ _('Keep low (0–0.3) for reliable actions.') }}</div></div>
         <div class="field"><label>{{ _('Time limit per answer (seconds)') }}</label><input type="number" min="10" name="timeout" value="{{ s.timeout }}"></div>
@@ -51,7 +51,7 @@
       <label class="check"><input type="checkbox" name="thinking" value="1" {{ 'checked' if s.thinking }}>
         <span>{{ _('Let the model think before answering') }}<small>{{ _('Can be a little more accurate, but on a normal computer each answer takes several seconds longer. Leave off unless answers are often wrong.') }}</small></span></label>
       <label class="check"><input type="checkbox" name="auto_download" value="1" {{ 'checked' if s.auto_download }}>
-        <span>{{ _('Download the model automatically when it is missing') }}<small>{{ _('A 2B model is about 2–3 GB. The download runs in the background; workshop commands work meanwhile.') }}</small></span></label>
+        <span>{{ _('Download the model automatically when it is missing') }}<small>{{ _('Small models are a few GB. The download runs in the background; workshop commands work meanwhile.') }}</small></span></label>
       <p class="small muted" style="margin-top:4px">{{ _('A 2B model needs about 3 GB of free memory and runs on the processor; a graphics card makes it faster but is not required. Larger models (4B–8B) understand better but answer more slowly.') }}</p>
     </div>
   </div>

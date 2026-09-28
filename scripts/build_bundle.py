@@ -356,7 +356,7 @@ README_TR = (
     "   - telefon/tabletlerin baglanabilmesi icin guvenlik duvarinda izin verir (yalnizca yerel ag),\r\n"
     "   - atolyeye ozel sertifikayi bu bilgisayara tanitir (https, uyari yok),\r\n"
     "   - uygulamayi baslatir ve telefon kurulum sayfasini (QR kodlari) acar.\r\n"
-    "3. Ilk acilista yapay zeka modeli arka planda indirilir (2-3 GB, bir kez).\r\n"
+    "3. Ilk acilista yapay zeka modeli arka planda indirilir (birkac GB, bir kez).\r\n"
     "   Ilerlemeyi Ayarlar > Asistan sayfasinda gorebilirsiniz.\r\n\r\n"
     "TELEFON / TABLET\r\n"
     "Uygulamada sol alttaki telefon simgesine (veya Ayarlar > Telefon ve tabletler) tiklayin ve QR kodlarini\r\n"
@@ -385,7 +385,7 @@ Python (python/LICENSE.txt) - Python Software Foundation License.
 Python packages in python/Lib/site-packages - see each package's *.dist-info/LICENSE file.
 
 AI models are not included. They are downloaded on first start from the Ollama library under their own licenses
-(e.g. Qwen models: see https://ollama.com/library).
+(e.g. Gemma or Qwen models: see each model's page at https://ollama.com/library).
 """
 
 

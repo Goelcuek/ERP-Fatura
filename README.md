@@ -16,7 +16,7 @@ A self-hosted web application for a medium-sized **power-tool repair workshop** 
 - **Backups**: everything is one folder. One-click and automatic backups to a zip file, a second copy to a
   USB/NAS/OneDrive folder, and a one-step restore.
 - **Assistant with voice**: technicians say "bu işi bitirdim" and the job is updated; other questions go to a free
-  local AI model (Qwen via Ollama). Invoices and payments always ask for confirmation.
+  local AI model (Gemma 4 via Ollama). Invoices and payments always ask for confirmation.
 - Turkish UI (English available per user), light & dark theme, works on phones and tablets in the workshop.
 
 | Dashboard | Service order |
@@ -255,7 +255,8 @@ speak; technicians can just say *"bu işi bitirdim"* and the job is updated.
 The Windows package (below) ships with [Ollama](https://github.com/ollama/ollama) (MIT license). When the app
 starts it launches the bundled Ollama in the background on its own port (11435, so it never clashes with an Ollama
 installed separately), keeps models in `data/models/ollama`, and **downloads the configured model automatically on
-first start** (`qwen3.5:2b`, about 2–3 GB, once). Settings → Assistant shows the download progress and has a
+first start** (`gemma4:e2b`, a few GB, once; any model with tool calling works, e.g. `qwen3.5:2b`, or a GGUF
+from Hugging Face as `hf.co/<user>/<repo>:<quantization>`). Settings → Assistant shows the download progress and has a
 *Download model now* button; until the model is ready the workshop commands already work, and the assistant says
 the model is still downloading. The app stops Ollama when it exits and restarts it if it stopped.
 

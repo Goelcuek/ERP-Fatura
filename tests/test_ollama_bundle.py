@@ -136,5 +136,5 @@ def test_model_status_endpoint(client, monkeypatch, tmp_path):
     fake = OllamaManager(str(tmp_path), str(tmp_path))
     monkeypatch.setattr(ollama_mod, "_manager", fake)
     st = client.get("/settings/assistant/model").json
-    assert st["running"] is False and st["model"] == "qwen3.5:2b" and st["download"]["state"] == "idle"
+    assert st["running"] is False and st["model"] == "gemma4:e2b" and st["download"]["state"] == "idle"
     assert client.get("/settings/assistant").status_code == 200

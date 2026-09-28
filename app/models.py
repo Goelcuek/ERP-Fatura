@@ -87,7 +87,7 @@ class Setting(db.Model):
         "assistant.server": "auto",  # auto: the bundled Ollama when present, else base_url
         "assistant.base_url": os.environ.get("ERP_ASSISTANT_BASE_URL", "http://127.0.0.1:11434/v1"),
         "assistant.auto_download": True,
-        "assistant.model": "qwen3.5:2b",
+        "assistant.model": "gemma4:e2b",
         "assistant.api_key": "",
         "assistant.temperature": 0.2,
         "assistant.thinking": False,  # let reasoning models think before answering (slower on a CPU)
