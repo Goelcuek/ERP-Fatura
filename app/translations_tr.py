@@ -1111,4 +1111,6 @@ TR = {
     '“{num}” is not an invoice number: 3 letters or digits, the year and 9 digits, e.g. ABC{year}000000123.': '“{num}” bir fatura numarası değil: 3 harf veya rakam, yıl ve 9 rakam olmalı, örn. ABC{year}000000123.',
     'e.g.': 'örn.',
     'Too many failed attempts. Please wait {n} seconds and try again.': 'Çok fazla başarısız deneme. Lütfen {n} saniye bekleyip tekrar deneyin.',
+    'Let the model think before answering': 'Model cevap vermeden önce düşünsün',
+    'Can be a little more accurate, but on a normal computer each answer takes several seconds longer. Leave off unless answers are often wrong.': 'Biraz daha isabetli olabilir, ancak normal bir bilgisayarda her cevap birkaç saniye daha uzun sürer. Cevaplar sık sık yanlış olmadıkça kapalı bırakın.',
 }

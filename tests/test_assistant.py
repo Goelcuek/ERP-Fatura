@@ -321,6 +321,27 @@ def test_backend_request_and_errors():
         b.chat([], [])
 
 
+def test_thinking_switch():
+    ok = Resp(200, {"choices": [{"message": {"content": "Tamam"}}]})
+    http = FakeHTTP(ok)
+    OpenAICompatibleBackend("http://think-off/v1", "qwen3.5:2b", thinking=False, session=http).chat([], [])
+    assert http.posts[0][1]["reasoning_effort"] == "none"  # Ollama: thinking off
+    http = FakeHTTP(ok)
+    OpenAICompatibleBackend("http://think-on/v1", "qwen3.5:2b", thinking=True, session=http).chat([], [])
+    assert "reasoning_effort" not in http.posts[0][1]  # model decides (thinks)
+
+
+def test_thinking_switch_falls_back_on_servers_that_reject_it():
+    reject = Resp(400, {"error": 'invalid reasoning value: "none"'})
+    ok = Resp(200, {"choices": [{"message": {"content": "Tamam"}}]})
+    http = FakeHTTP(reject, ok, ok)
+    b = OpenAICompatibleBackend("http://old-ollama/v1", "qwen3.5:2b", thinking=False, session=http)
+    assert b.chat([], []).text == "Tamam"  # retried without the switch
+    assert "reasoning_effort" not in http.posts[1][1]
+    b.chat([], [])
+    assert len(http.posts) == 3 and "reasoning_effort" not in http.posts[2][1]  # remembered: no second failure
+
+
 def test_backend_health():
     b = OpenAICompatibleBackend("http://x/v1", "qwen3.5:2b", session=FakeHTTP(Resp(200, {"data": [{"id": "llama3"}]})))
     ok, msg = b.health()

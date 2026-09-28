@@ -48,6 +48,8 @@
         <div class="field"><label>{{ _('Time limit per answer (seconds)') }}</label><input type="number" min="10" name="timeout" value="{{ s.timeout }}"></div>
         <div class="field span-2"><label>{{ _('API key (optional)') }}</label><input type="password" name="api_key" autocomplete="off" placeholder="{{ '••••••••  ' ~ _('(saved — leave empty to keep)') if s.api_key else _('Not needed for Ollama') }}"></div>
       </div>
+      <label class="check"><input type="checkbox" name="thinking" value="1" {{ 'checked' if s.thinking }}>
+        <span>{{ _('Let the model think before answering') }}<small>{{ _('Can be a little more accurate, but on a normal computer each answer takes several seconds longer. Leave off unless answers are often wrong.') }}</small></span></label>
       <label class="check"><input type="checkbox" name="auto_download" value="1" {{ 'checked' if s.auto_download }}>
         <span>{{ _('Download the model automatically when it is missing') }}<small>{{ _('A 2B model is about 2–3 GB. The download runs in the background; workshop commands work meanwhile.') }}</small></span></label>
       <p class="small muted" style="margin-top:4px">{{ _('A 2B model needs about 3 GB of free memory and runs on the processor; a graphics card makes it faster but is not required. Larger models (4B–8B) understand better but answer more slowly.') }}</p>

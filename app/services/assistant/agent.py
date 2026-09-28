@@ -72,7 +72,8 @@ def backend(cfg=None):
     cfg = cfg or settings()
     return OpenAICompatibleBackend(cfg["effective_base_url"], cfg["model"], api_key=cfg.get("api_key", ""),
                                    timeout=int(cfg.get("timeout") or 120),
-                                   temperature=float(cfg.get("temperature") or 0.2))
+                                   temperature=float(cfg.get("temperature") or 0.2),
+                                   thinking=bool(cfg.get("thinking")))
 
 
 def _now():

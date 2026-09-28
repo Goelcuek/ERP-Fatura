@@ -214,6 +214,7 @@ def assistant():
         except ValueError:
             pass
         Setting.set("assistant.timeout", max(10, f_int("timeout", 120)))
+        Setting.set("assistant.thinking", f_bool("thinking"))
         Setting.set("voice.engine", f_str("voice_engine") if f_str("voice_engine") in ("auto", "browser", "local", "off")
                     else "auto")
         Setting.set("voice.lang", f_str("voice_lang") or "tr-TR")

@@ -95,13 +95,18 @@ def parse_message(message):
     return Turn(text=content.strip(), tool_calls=calls)
 
 
+# servers that rejected reasoning_effort (older Ollama, some other servers): don't send it again
+_NO_REASONING_PARAM = set()
+
+
 class OpenAICompatibleBackend:
-    def __init__(self, base_url, model, api_key="", timeout=120, temperature=0.2, session=None):
+    def __init__(self, base_url, model, api_key="", timeout=120, temperature=0.2, thinking=True, session=None):
         self.base_url = (base_url or "").rstrip("/")
         self.model = model
         self.api_key = api_key
         self.timeout = timeout
         self.temperature = temperature
+        self.thinking = thinking
         self.http = session or requests.Session()
 
     def _headers(self):
@@ -120,13 +125,13 @@ class OpenAICompatibleBackend:
         if tools:
             body["tools"] = [{"type": "function", "function": t} for t in tools]
             body["tool_choice"] = "auto"
-        try:
-            resp = self.http.post(f"{self.base_url}/chat/completions", json=body, headers=self._headers(),
-                                  timeout=self.timeout)
-        except requests.Timeout:
-            raise LLMError("The local AI model took too long to answer.")
-        except requests.RequestException:
-            raise LLMError("The local AI model is not running. Start Ollama (or your model server) and try again.")
+        if not self.thinking and self.base_url not in _NO_REASONING_PARAM:
+            body["reasoning_effort"] = "none"  # Ollama: turns the model's thinking off (answers much sooner)
+        resp = self._post(body)
+        if resp.status_code == 400 and "reasoning_effort" in body and "reason" in resp.text.lower():
+            _NO_REASONING_PARAM.add(self.base_url)  # server doesn't know the switch: think as usual
+            del body["reasoning_effort"]
+            resp = self._post(body)
         if resp.status_code == 404:
             raise LLMError(f"Model “{self.model}” was not found on the model server. Check the model name in Settings.")
         if resp.status_code >= 400:
@@ -139,6 +144,15 @@ class OpenAICompatibleBackend:
         turn = parse_message(message)
         turn.usage = data.get("usage") or {}
         return turn
+
+    def _post(self, body):
+        try:
+            return self.http.post(f"{self.base_url}/chat/completions", json=body, headers=self._headers(),
+                                  timeout=self.timeout)
+        except requests.Timeout:
+            raise LLMError("The local AI model took too long to answer.")
+        except requests.RequestException:
+            raise LLMError("The local AI model is not running. Start Ollama (or your model server) and try again.")
 
     def health(self):
         """Returns (ok, message). Checks that the server answers and the model is installed."""
