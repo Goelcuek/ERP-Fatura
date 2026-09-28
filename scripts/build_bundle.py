@@ -306,7 +306,9 @@ def install_wheels(target, py_version, with_voice):
     reqs = ["-r", str(ROOT / "requirements.txt")]
     if with_voice:
         reqs += ["-r", str(ROOT / "requirements-voice.txt")]
-    cmd = [sys.executable, "-m", "pip", "install", "--quiet", "--target", str(target), "--platform", "win_amd64",
+    # --no-compile: bytecode made by the build machine's Python would not match the bundled one
+    cmd = [sys.executable, "-m", "pip", "install", "--quiet", "--no-compile", "--target", str(target),
+           "--platform", "win_amd64",
            "--python-version", py_version, "--implementation", "cp", "--only-binary=:all:", "--upgrade", *reqs]
     log("installing Python packages for Windows")
     subprocess.run(cmd, check=True)
@@ -417,6 +419,8 @@ def build_windows(out, args):
                          action="uninstall").replace("\n", "\r\n"))
     (stage / "Durdur.bat").write_text(STOP_BAT.replace("\n", "\r\n"))
     (stage / "BENIOKU.txt").write_text(README_TR)
+    for cache in list(stage.rglob("__pycache__")):  # never ship bytecode compiled by another Python version
+        shutil.rmtree(cache)
     archive = Path(out) / f"{name}-windows-x64.zip"
     log(f"creating {archive.name}")
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zf:
