@@ -186,7 +186,7 @@
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognizer = null, recorder = null, chunks = [], stopTimer = null;
 
-  function micState(on) { micBtn.classList.toggle("is-on", on); root.classList.toggle("is-listening", on); }
+  function micState(on) { micBtn?.classList.toggle("is-on", on); root.classList.toggle("is-listening", on); }
 
   function startBrowser() {
     if (!SR) { setStatus(T.no_mic); return; }
@@ -248,7 +248,7 @@
     setStatus(T.listening);
   }
 
-  micBtn.addEventListener("click", async () => {
+  micBtn?.addEventListener("click", async () => {
     await load();
     if (!window.isSecureContext) { setStatus(T.need_https); return; }
     if (recognizer) { recognizer.stop(); return; }

@@ -64,7 +64,7 @@
             {% for k, label in [('auto', _('Automatic')), ('local', _('On this computer (Whisper, offline)')), ('browser', _('Browser (Chrome/Edge, needs internet)')), ('off', _('Off'))] %}
             <option value="{{ k }}" {{ 'selected' if v.engine == k }}>{{ label }}</option>{% endfor %}
           </select>
-          <div class="hint">{% if whisper %}<span class="pos">{{ _('Offline Whisper is installed.') }}</span>{% else %}{{ _('Offline Whisper is not installed: pip install -r requirements-voice.txt') }}{% endif %}</div></div>
+          <div class="hint">{% if whisper %}<span class="pos">{{ _('Offline Whisper is installed.') }}</span>{% else %}{{ _('Offline Whisper is not installed. To add it, run in the app folder: python\\python.exe -m pip install -r requirements-voice.txt') }}{% endif %}</div></div>
         <div class="field"><label>{{ _('Language') }}</label>
           <select name="voice_lang">{% for k, label in [('tr-TR', 'Türkçe'), ('en-US', 'English')] %}<option value="{{ k }}" {{ 'selected' if v.lang == k }}>{{ label }}</option>{% endfor %}</select></div>
         <div class="field"><label>{{ _('Whisper model') }}</label>

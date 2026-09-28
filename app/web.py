@@ -245,7 +245,8 @@ def init_web(app):
         return {"company_name": name, "brand_name": short, "brand_initials": branding.initials(short),
                 "has_logo": bool(branding.logo_path()),
                 "assistant_enabled": bool(g.get("user")) and bool(Setting.get("assistant.enabled")),
-                "setup_pending": bool(g.get("user")) and g.user.is_admin and bool(Setting.get("setup.pending"))}
+                "setup_pending": bool(g.get("user")) and g.user.is_admin and bool(Setting.get("setup.pending")),
+                "voice_enabled": Setting.get("voice.engine") != "off"}
 
     @app.after_request
     def security_headers(resp):

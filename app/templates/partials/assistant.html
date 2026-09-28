@@ -27,7 +27,7 @@
     </div>
     <div class="asst-pending" data-asst-pending></div>
     <form class="asst-input" data-asst-form>
-      <button type="button" class="asst-mic" data-asst-mic title="{{ _('Hold to talk') }}" aria-label="{{ _('Speak') }}">{{ icon('mic') }}</button>
+      {% if voice_enabled %}<button type="button" class="asst-mic" data-asst-mic title="{{ _('Hold to talk') }}" aria-label="{{ _('Speak') }}">{{ icon('mic') }}</button>{% endif %}
       <textarea rows="1" data-asst-text placeholder="{{ _('Type a message…') }}" aria-label="{{ _('Message') }}"></textarea>
       <button class="asst-send" aria-label="{{ _('Send') }}">{{ icon('send') }}</button>
     </form>

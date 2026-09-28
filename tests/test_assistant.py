@@ -411,3 +411,11 @@ def test_https_certificate(tmp_path):
     cert, key = ensure_cert(str(tmp_path))
     assert open(cert).read().startswith("-----BEGIN CERTIFICATE")
     assert ensure_cert(str(tmp_path)) == (cert, key)
+
+
+def test_microphone_hidden_only_when_voice_is_off(app, client):
+    assert "data-asst-mic" in client.get("/assistant/").get_data(as_text=True)  # default: automatic voice
+    with app.app_context():
+        Setting.set("voice.engine", "off")
+        db.session.commit()
+    assert "data-asst-mic" not in client.get("/assistant/").get_data(as_text=True)

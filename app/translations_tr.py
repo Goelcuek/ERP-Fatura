@@ -973,7 +973,7 @@ TR = {
     'On this computer (Whisper, offline)': 'Bu bilgisayarda (Whisper, internetsiz)',
     'Browser (Chrome/Edge, needs internet)': 'Tarayıcı (Chrome/Edge, internet gerekir)',
     'Offline Whisper is installed.': 'İnternetsiz Whisper kurulu.',
-    'Offline Whisper is not installed: pip install -r requirements-voice.txt': 'İnternetsiz Whisper kurulu değil: pip install -r requirements-voice.txt',
+    'Offline Whisper is not installed. To add it, run in the app folder: python\\python.exe -m pip install -r requirements-voice.txt': 'İnternetsiz Whisper kurulu değil. Eklemek için uygulama klasöründe şunu çalıştırın: python\\python.exe -m pip install -r requirements-voice.txt',
     'Whisper model': 'Whisper modeli',
     'base — fastest': 'base — en hızlı',
     'small — recommended': 'small — önerilen',
