@@ -113,3 +113,47 @@ def test_download_verifies_checksum(tmp_path, monkeypatch):
     ok = build_bundle.download("http://x/f", tmp_path / "f",
                                expected_sha="ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
     assert ok.read_bytes() == b"abc"
+
+
+def fake_nuget_python(path):
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("python.nuspec", "<package/>")
+        for f in ("python.exe", "pythonw.exe", "python3.dll", "python312.dll", "LICENSE.txt"):
+            zf.writestr(f"tools/{f}", b"MZ")
+        zf.writestr("tools/Lib/os.py", "")
+        zf.writestr("tools/DLLs/_ssl.pyd", b"MZ")
+        zf.writestr("tools/include/Python.h", "")
+        zf.writestr("tools/libs/python312.lib", b"")
+    return path
+
+
+def test_nuget_python_is_isolated_like_the_embeddable_one(tmp_path):
+    dest = tmp_path / "python"
+    assert build_bundle.install_python(dest, fake_nuget_python(tmp_path / "python.3.12.10.nupkg")) == "3.12"
+    assert (dest / "pythonw.exe").exists() and (dest / "Lib/os.py").exists() and (dest / "DLLs/_ssl.pyd").exists()
+    assert not (dest / "include").exists() and not (dest / "libs").exists()  # build-only files left out
+    pth = (dest / "python312._pth").read_text().splitlines()
+    assert pth == ["Lib", "DLLs", ".", "Lib\\site-packages", "..", "import site"]
+
+
+def test_ollama_release_without_github_api(monkeypatch):
+    class R:
+        def __init__(self, status, text=""):
+            self.status_code, self.text = status, text
+
+    sums = ("aa" * 32 + "  ./ollama-windows-amd64.zip\n" + "bb" * 32 + "  ./ollama-linux-amd64.tgz\n")
+
+    def fake_get(url, **kw):
+        if "api.github.com" in url:
+            return R(403)
+        if "/v9.9.9/" in url:
+            return R(404)  # newest tag, release not published yet
+        return R(200, sums)
+
+    monkeypatch.setattr(build_bundle.requests, "get", fake_get)
+    monkeypatch.setattr(build_bundle, "latest_tag", lambda: ["v9.9.9", "v9.9.8"])
+    release = build_bundle.resolve_release("latest")
+    assert release["tag_name"] == "v9.9.8"
+    win = build_bundle.pick_asset(release, "windows")
+    assert win["browser_download_url"] == "https://github.com/ollama/ollama/releases/download/v9.9.8/ollama-windows-amd64.zip"
+    assert build_bundle.asset_checksum(release, win) == "aa" * 32

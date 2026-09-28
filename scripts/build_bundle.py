@@ -20,6 +20,7 @@ Downloads are checked against the SHA-256 checksums GitHub publishes for each re
 """
 
 import argparse
+import base64
 import hashlib
 import io
 import re
@@ -36,6 +37,8 @@ ROOT = Path(__file__).resolve().parent.parent
 CACHE = ROOT / "build" / "cache"
 PYTHON_VERSION = "3.12.10"  # embeddable CPython for the Windows package
 GITHUB_API = "https://api.github.com/repos/ollama/ollama/releases"
+OLLAMA_REPO = "https://github.com/ollama/ollama"
+NUGET = "https://api.nuget.org"
 ASSETS = {  # preferred archive per platform, first match wins
     "windows": [r"^ollama-windows-amd64\.zip$"],
     "linux": [r"^ollama-linux-amd64\.tgz$", r"^ollama-linux-amd64\.tar\.zst$"],
@@ -90,10 +93,43 @@ def download(url, dest, expected_sha=None):
 
 def resolve_release(version):
     url = f"{GITHUB_API}/latest" if version == "latest" else f"{GITHUB_API}/tags/{version}"
-    r = requests.get(url, timeout=30, headers={"Accept": "application/vnd.github+json"})
-    if r.status_code != 200:
-        raise BuildError(f"cannot read Ollama release {version}: HTTP {r.status_code}")
-    return r.json()
+    try:
+        r = requests.get(url, timeout=30, headers={"Accept": "application/vnd.github+json"})
+        if r.status_code == 200:
+            return r.json()
+        reason = f"HTTP {r.status_code}"
+    except requests.RequestException as e:
+        reason = str(e)
+    # the API is rate-limited or blocked on some networks: the release files themselves usually aren't
+    log(f"GitHub API unavailable ({reason}); using the release download links directly")
+    return release_without_api(version)
+
+
+def latest_tag():
+    """Newest stable Ollama tag, read with git (no GitHub API needed)."""
+    out = subprocess.run(["git", "ls-remote", "--tags", "--refs", f"{OLLAMA_REPO}.git"], capture_output=True,
+                         text=True, timeout=120)
+    tags = re.findall(r"refs/tags/(v(\d+)\.(\d+)\.(\d+))$", out.stdout, re.M)
+    if not tags:
+        raise BuildError("cannot find the latest Ollama version; pass --ollama-version vX.Y.Z")
+    return [t[0] for t in sorted(tags, key=lambda t: tuple(int(x) for x in t[1:]), reverse=True)]
+
+
+def release_without_api(version):
+    """Release info in the API's shape, from the public download links (checksums from sha256sum.txt)."""
+    for tag in latest_tag()[:5] if version == "latest" else [version]:
+        base = f"{OLLAMA_REPO}/releases/download/{tag}"
+        try:  # a tag whose release isn't published yet has no files: try the one before
+            sums = requests.get(f"{base}/sha256sum.txt", timeout=30)
+        except requests.RequestException as e:
+            raise BuildError(f"cannot reach the Ollama downloads: {e}")
+        if sums.status_code != 200:
+            continue
+        names = [ln.split()[1].lstrip("*./") for ln in sums.text.splitlines() if len(ln.split()) == 2]
+        assets = [{"name": n, "browser_download_url": f"{base}/{n}"} for n in names]
+        assets.append({"name": "sha256sum.txt", "browser_download_url": f"{base}/sha256sum.txt"})
+        return {"tag_name": tag, "assets": assets}
+    raise BuildError(f"no downloadable Ollama release found for {version}")
 
 
 def pick_asset(release, platform):
@@ -196,9 +232,22 @@ def install_ollama(platform, dest, version="latest", archive=None, cpu_only=Fals
 # ---------------------------------------------------------------- Windows package
 
 def install_python(dest, archive=None, version=PYTHON_VERSION):
+    """Portable CPython for Windows in `dest`; returns "3.12".
+
+    Source: python.org's embeddable zip, or — when python.org is unreachable — the Python Software
+    Foundation's NuGet package (a full portable CPython), verified against NuGet's SHA-512.
+    """
     if archive is None:
         url = f"https://www.python.org/ftp/python/{version}/python-{version}-embed-amd64.zip"
-        archive = download(url, CACHE / f"python-{version}-embed-amd64.zip")
+        try:
+            archive = download(url, CACHE / f"python-{version}-embed-amd64.zip")
+        except (requests.RequestException, BuildError) as e:
+            log(f"python.org unavailable ({e}); using the Python Software Foundation's NuGet package")
+            archive = download_nuget_python(version)
+    with zipfile.ZipFile(archive) as zf:
+        names = zf.namelist()
+    if "tools/python.exe" in names:
+        return _install_nuget_python(archive, dest)
     extract(archive, dest)
     pth = next(Path(dest).glob("python3*._pth"), None)
     if pth is None:
@@ -209,6 +258,48 @@ def install_python(dest, archive=None, version=PYTHON_VERSION):
     pth.write_text("\n".join(dict.fromkeys(lines)) + "\n")
     major_minor = re.search(r"python(\d)(\d+)\._pth", pth.name)
     return f"{major_minor.group(1)}.{major_minor.group(2)}"
+
+
+def download_nuget_python(version):
+    dest = CACHE / f"python.{version}.nupkg"
+    try:
+        reg = requests.get(f"{NUGET}/v3/registration5-semver1/python/{version}.json", timeout=30).json()
+        entry = requests.get(reg["catalogEntry"], timeout=30).json()
+    except (requests.RequestException, ValueError, KeyError) as e:
+        raise BuildError(f"cannot read the NuGet catalog for Python {version}: {e}")
+    if entry.get("packageHashAlgorithm") != "SHA512" or "Python Software Foundation" not in entry.get("authors", ""):
+        raise BuildError("unexpected NuGet package metadata for Python; refusing it")
+    want = base64.b64decode(entry["packageHash"])
+    if not (dest.exists() and hashlib.sha512(dest.read_bytes()).digest() == want):
+        download(f"{NUGET}/v3-flatcontainer/python/{version}/python.{version}.nupkg", dest)
+        if hashlib.sha512(dest.read_bytes()).digest() != want:
+            dest.unlink()
+            raise BuildError("checksum mismatch for the NuGet Python package")
+    log(f"Python {version} (NuGet) verified (sha512 {want.hex()[:16]}…)")
+    return dest
+
+
+def _install_nuget_python(archive, dest):
+    """The NuGet layout keeps CPython in tools/; copy what runs (not the C headers/libs for building)."""
+    dest = Path(dest)
+    with zipfile.ZipFile(archive) as zf:
+        safe_members(zf.namelist())
+        for info in zf.infolist():
+            rel = info.filename[len("tools/"):] if info.filename.startswith("tools/") else None
+            if not rel or info.is_dir() or rel.split("/")[0] in ("include", "libs"):
+                continue
+            out = dest / rel
+            out.parent.mkdir(parents=True, exist_ok=True)
+            with zf.open(info) as src, open(out, "wb") as fh:
+                shutil.copyfileobj(src, fh)
+    m = next(filter(None, (re.fullmatch(r"python(\d)(\d+)\.dll", f.name) for f in dest.glob("python*.dll"))), None)
+    if not m:
+        raise BuildError("python3XX.dll not found in the NuGet Python")
+    # a ._pth file makes it behave like the embeddable one: isolated from any other Python on the PC
+    # (no registry, no PYTHONPATH, no user site-packages) and finding the app in the folder above
+    (dest / f"python{m.group(1)}{m.group(2)}._pth").write_text(
+        "Lib\nDLLs\n.\nLib\\site-packages\n..\nimport site\n")
+    return f"{m.group(1)}.{m.group(2)}"
 
 
 def install_wheels(target, py_version, with_voice):
