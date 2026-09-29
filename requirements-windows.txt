@@ -1,0 +1,3 @@
+# Windows package only (scripts/build_bundle.py): Kur.bat writes shortcuts through the Windows
+# Script Host object instead of PowerShell.
+comtypes>=1.4

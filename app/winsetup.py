@@ -1,21 +1,23 @@
-"""One-time Windows set-up for the workshop PC (run by Kur.bat as administrator).
+"""Windows set-up for the workshop PC, kept to what an ordinary program does so antivirus stays calm.
 
-    python -m app.winsetup install     # certificate trust, firewall, autostart, desktop shortcut, start
-    python -m app.winsetup uninstall   # undo all of that (data is kept)
-    python -m app.winsetup stop        # stop the background server (e.g. before an update)
+    python -m app.winsetup install      # autostart + desktop shortcut + start (Kur.bat, no admin rights)
+    python -m app.winsetup uninstall    # undo that (Kaldir.bat); data is kept
+    python -m app.winsetup stop         # stop the background app (Durdur.bat)
+    python -m app.winsetup firewall     # allow phones through Windows Firewall (Telefon-Izni.bat, as admin)
+    python -m app.winsetup firewall --remove
     python -m app.winsetup install --dry-run   # only print what would be done
 
-install:
-  1. creates the shop certificate (data/tls) and adds its CA to Windows' trusted roots, so the
-     browsers on this PC open https://127.0.0.1:8443 without a warning;
-  2. opens the ports 8080/8443 in Windows Firewall for this app's Python, local network only;
-  3. puts a shortcut in the common Startup folder: the app starts hidden (pythonw) at every log-in;
-  4. puts an “Atölye” shortcut on the public desktop;
-  5. starts the app now and opens the phone set-up page.
+What install does — for the current Windows user only, no administrator rights, no PowerShell:
+  1. creates the shop certificate in data/tls (used by phones; nothing is added to Windows);
+  2. puts a shortcut in the user's Startup folder: the app starts in the background at log-in;
+  3. puts an “Atölye” shortcut on the desktop, opening http://localhost:8080 (on this PC the
+     browser allows the microphone and the app install without any certificate);
+  4. starts the app and opens it.
+Phones reach the app through Windows Firewall: Windows asks once when the app starts; if that was
+missed or refused, Telefon-Izni.bat (run as administrator) adds the permission.
 """
 
 import argparse
-import base64
 import os
 import subprocess
 import sys
@@ -26,10 +28,34 @@ from . import BASE_DIR
 RULE_NAME = "Atolye ERP"
 SHORTCUT_NAME = "Atolye"
 HTTP_PORT, HTTPS_PORT = 8080, 8443
+LOCAL_URL = f"http://localhost:{HTTP_PORT}/"
+
+# Windows known folders (per user; follows OneDrive/redirected folders)
+FOLDERID_STARTUP = "{B97D20BB-F46A-4C97-BA10-5E3608430854}"
+FOLDERID_DESKTOP = "{B4BFCC3A-DB2C-424C-B029-7FE99A87C641}"
+
+
+def known_folder(guid):
+    import ctypes
+    from ctypes import wintypes
+
+    class GUID(ctypes.Structure):
+        _fields_ = [("Data1", wintypes.DWORD), ("Data2", wintypes.WORD), ("Data3", wintypes.WORD),
+                    ("Data4", ctypes.c_ubyte * 8)]
+
+    g = GUID()
+    ctypes.windll.ole32.CLSIDFromString(ctypes.c_wchar_p(guid), ctypes.byref(g))
+    path = ctypes.c_wchar_p()
+    if ctypes.windll.shell32.SHGetKnownFolderPath(ctypes.byref(g), 0, None, ctypes.byref(path)) != 0:
+        raise OSError(f"known folder {guid} not found")
+    try:
+        return path.value
+    finally:
+        ctypes.windll.ole32.CoTaskMemFree(path)
 
 
 class Paths:
-    def __init__(self, base_dir=BASE_DIR, env=None):
+    def __init__(self, base_dir=BASE_DIR, env=None, startup_dir=None, desktop_dir=None):
         env = os.environ if env is None else env
         self.base = base_dir
         self.data = os.path.abspath(env.get("ERP_DATA_DIR") or os.path.join(base_dir, "data"))
@@ -40,36 +66,31 @@ class Paths:
         self.pythonw = os.path.join(pydir, "pythonw.exe")
         self.run_py = os.path.join(base_dir, "run.py")
         self.icon = os.path.join(self.data, "atolye.ico")
-        program_data = env.get("ProgramData", r"C:\ProgramData")
-        self.startup_lnk = os.path.join(program_data, "Microsoft", "Windows", "Start Menu", "Programs", "StartUp",
-                                        SHORTCUT_NAME + ".lnk")
-        public = env.get("PUBLIC", r"C:\Users\Public")
-        self.desktop_url = os.path.join(public, "Desktop", SHORTCUT_NAME + ".url")
-        self.ca = os.path.join(self.data, "tls", "ca.crt")
+        if startup_dir is None or desktop_dir is None:
+            if os.name == "nt":
+                startup_dir = startup_dir or known_folder(FOLDERID_STARTUP)
+                desktop_dir = desktop_dir or known_folder(FOLDERID_DESKTOP)
+            else:  # --dry-run elsewhere: typical locations, for display only
+                home = env.get("USERPROFILE", r"C:\Users\user")
+                startup_dir = startup_dir or os.path.join(home, "AppData", "Roaming", "Microsoft", "Windows",
+                                                          "Start Menu", "Programs", "Startup")
+                desktop_dir = desktop_dir or os.path.join(home, "Desktop")
+        self.startup_lnk = os.path.join(startup_dir, SHORTCUT_NAME + ".lnk")
+        self.desktop_url = os.path.join(desktop_dir, SHORTCUT_NAME + ".url")
         self.pid = os.path.join(self.data, "server.pid")
+        # left behind by the first version of the installer (machine-wide); removed on uninstall
+        program_data = env.get("ProgramData", r"C:\ProgramData")
+        public = env.get("PUBLIC", r"C:\Users\Public")
+        self.legacy = [os.path.join(program_data, "Microsoft", "Windows", "Start Menu", "Programs", "StartUp",
+                                    SHORTCUT_NAME + ".lnk"),
+                       os.path.join(public, "Desktop", SHORTCUT_NAME + ".url")]
 
 
 # ---------------------------------------------------------------- command builders (pure, testable)
 
-def _ps_quote(value):
-    return "'" + str(value).replace("'", "''") + "'"
-
-
-def cmd_trust_ca(ca_path):
-    return ["certutil", "-addstore", "-f", "Root", ca_path]
-
-
-def cmd_untrust_ca(thumbprint):
-    return ["certutil", "-delstore", "Root", thumbprint]
-
-
 def cmds_firewall(programs):
-    """Remove old rules for these programs (including 'blocked' answers to Windows' first-run prompt),
-    then allow the app's ports from the local network only (works on 'public' Wi-Fi profiles too)."""
-    cmds = []
-    for prog in programs:
-        cmds.append(["netsh", "advfirewall", "firewall", "delete", "rule", "name=all", f"program={prog}"])
-    cmds.append(["netsh", "advfirewall", "firewall", "delete", "rule", f"name={RULE_NAME}"])
+    """Allow the app's ports from the local network only (also on Wi-Fi marked 'public')."""
+    cmds = [["netsh", "advfirewall", "firewall", "delete", "rule", f"name={RULE_NAME}"]]
     for prog in programs:
         cmds.append(["netsh", "advfirewall", "firewall", "add", "rule", f"name={RULE_NAME}", "dir=in", "action=allow",
                      f"program={prog}", "protocol=TCP", f"localport={HTTP_PORT},{HTTPS_PORT}",
@@ -81,16 +102,6 @@ def cmds_firewall_remove():
     return [["netsh", "advfirewall", "firewall", "delete", "rule", f"name={RULE_NAME}"]]
 
 
-def cmd_shortcut(lnk, target, arguments, workdir, icon):
-    script = (f"$s = (New-Object -ComObject WScript.Shell).CreateShortcut({_ps_quote(lnk)}); "
-              f"$s.TargetPath = {_ps_quote(target)}; $s.Arguments = {_ps_quote(arguments)}; "
-              f"$s.WorkingDirectory = {_ps_quote(workdir)}; $s.IconLocation = {_ps_quote(icon)}; "
-              "$s.WindowStyle = 7; $s.Save()")
-    # encoded: no quoting problems with spaces, quotes or Turkish letters in paths
-    encoded = base64.b64encode(script.encode("utf-16-le")).decode()
-    return ["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encoded]
-
-
 def server_args(paths):
     return f'"{paths.run_py}" --https --background'
 
@@ -100,7 +111,31 @@ def url_file_content(url, icon):
 
 
 def cmd_kill(pid):
-    return ["taskkill", "/PID", str(pid), "/T", "/F"]
+    # the image-name filter makes sure a recycled process id never hits another program
+    return ["taskkill", "/PID", str(pid), "/T", "/F", "/FI", "IMAGENAME eq pythonw.exe"]
+
+
+def make_shortcut(lnk, target, arguments, workdir, icon):
+    """A normal Windows shortcut (.lnk), written through the Windows Script Host object — no PowerShell."""
+    import comtypes.client
+
+    shell = comtypes.client.CreateObject("WScript.Shell", dynamic=True)
+    sc = shell.CreateShortcut(lnk)
+    sc.TargetPath = target
+    sc.Arguments = arguments
+    sc.WorkingDirectory = workdir
+    sc.IconLocation = icon
+    sc.Description = "Atölye ERP"
+    sc.Save()
+
+
+def is_admin():
+    try:
+        import ctypes
+
+        return bool(ctypes.windll.shell32.IsUserAnAdmin())
+    except (AttributeError, OSError):
+        return False
 
 
 # ---------------------------------------------------------------- steps
@@ -122,6 +157,16 @@ class Runner:
             self.out(f"   ! {label}: {(res.stdout + res.stderr).strip()[:300]}")
         return res.returncode == 0
 
+    def step(self, label, fn, *args):
+        if self.dry_run:
+            self.out(f"   > {label}")
+            return
+        try:
+            fn(*args)
+        except Exception as e:  # report and carry on with the other steps
+            self.failed.append(label)
+            self.out(f"   ! {label}: {e}")
+
 
 def _branding(paths):
     """Monogram and logo for the icon, read from the database without starting the web app."""
@@ -140,79 +185,93 @@ def _branding(paths):
     return initials, logo
 
 
-def install(paths, runner):
+def _write_url(path, content):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="mbcs" if os.name == "nt" else "utf-8", errors="replace") as fh:
+        fh.write(content)
+
+
+def _make_icon(paths):
     from .services.mobile import windows_ico
+
+    initials, logo = _branding(paths)
+    windows_ico(paths.icon, initials, logo)
+
+
+def install(paths, runner, open_app=True):
     from .tls import ensure_cert
 
     say = runner.out
-    say("1/5  Sertifika oluşturuluyor ve bu bilgisayara tanıtılıyor…")
+    say("1/4  Telefonlar için sertifika hazırlanıyor…")
     os.makedirs(paths.data, exist_ok=True)
-    if not runner.dry_run:
-        ensure_cert(paths.data)
-    runner.run(cmd_trust_ca(paths.ca), "certutil")
+    runner.step("sertifika", ensure_cert, paths.data)
+    runner.step("simge", _make_icon, paths)
 
-    say("2/5  Güvenlik duvarında telefonlar için izin veriliyor (yalnızca yerel ağ)…")
-    for cmd in cmds_firewall([paths.python, paths.pythonw]):
-        runner.run(cmd, "netsh", quiet_fail="delete" in cmd)
+    say("2/4  Windows açılınca otomatik başlatma ayarlanıyor…")
+    runner.step(paths.startup_lnk, make_shortcut, paths.startup_lnk, paths.pythonw, server_args(paths), paths.base,
+                paths.icon)
 
-    say("3/5  Windows açılınca otomatik başlatma ayarlanıyor…")
-    if not runner.dry_run:
-        initials, logo = _branding(paths)
-        windows_ico(paths.icon, initials, logo)
-    runner.run(cmd_shortcut(paths.startup_lnk, paths.pythonw, server_args(paths), paths.base, paths.icon), "startup")
+    say("3/4  Masaüstüne “Atölye” kısayolu ekleniyor…")
+    runner.step(paths.desktop_url, _write_url, paths.desktop_url, url_file_content(LOCAL_URL, paths.icon))
 
-    say("4/5  Masaüstüne “Atölye” kısayolu ekleniyor…")
-    content = url_file_content(f"https://127.0.0.1:{HTTPS_PORT}/", paths.icon)
-    if runner.dry_run:
-        say(f"   > {paths.desktop_url}")
-    else:
-        try:
-            os.makedirs(os.path.dirname(paths.desktop_url), exist_ok=True)
-            with open(paths.desktop_url, "w", encoding="mbcs" if os.name == "nt" else "utf-8", errors="replace") as fh:
-                fh.write(content)
-        except OSError as e:
-            runner.failed.append("desktop")
-            say(f"   ! {e}")
-
-    say("5/5  Uygulama başlatılıyor…")
+    say("4/4  Uygulama başlatılıyor…")
     if not runner.dry_run:
         start_server(paths)
-        if wait_for_port(HTTPS_PORT, 60):
-            open_browser(f"https://127.0.0.1:{HTTPS_PORT}/connect")
+        if wait_for_port(HTTP_PORT, 90):
+            if open_app:
+                open_browser(LOCAL_URL)
         else:
-            say("   ! Uygulama 60 saniyede açılmadı; ayrıntı: data\\logs\\server.log")
+            say("   ! Uygulama 90 saniyede açılmadı; ayrıntı: data\\logs\\server.log")
             runner.failed.append("start")
     say("")
     if runner.failed:
         say("Kurulum tamamlandı, ancak bazı adımlar başarısız oldu: " + ", ".join(runner.failed))
     else:
-        say("Kurulum tamamlandı. Telefonları bağlamak için açılan sayfadaki QR kodlarını kullanın.")
+        say("Kurulum tamamlandı. Uygulama tarayıcıda açılıyor (masaüstündeki “Atölye” kısayolu).")
+        say("Windows güvenlik duvarı Python için izin sorarsa “İzin ver”e tıklayın: telefonlar bu sayede bağlanır.")
     return not runner.failed
 
 
 def uninstall(paths, runner):
-    from .tls import ca_fingerprint
-
     say = runner.out
     say("Uygulama durduruluyor…")
     stop(paths, runner)
-    say("Güvenlik duvarı kuralları kaldırılıyor…")
-    for cmd in cmds_firewall_remove():
-        runner.run(cmd, "netsh", quiet_fail=True)
-    if os.path.exists(paths.ca):
-        say("Sertifika güvenilir listesinden çıkarılıyor…")
-        runner.run(cmd_untrust_ca(ca_fingerprint(paths.data)), "certutil", quiet_fail=True)
     say("Kısayollar siliniyor…")
-    for f in (paths.startup_lnk, paths.desktop_url):
+    for f in [paths.startup_lnk, paths.desktop_url, *paths.legacy]:
         if runner.dry_run:
             say(f"   x {f}")
-        else:
-            try:
-                os.remove(f)
-            except FileNotFoundError:
-                pass
+            continue
+        try:
+            os.remove(f)
+        except FileNotFoundError:
+            pass
+        except OSError as e:  # e.g. an old machine-wide shortcut without admin rights
+            say(f"   ! {f}: {e}")
+    if is_admin() or runner.dry_run:
+        say("Güvenlik duvarı izni kaldırılıyor…")
+        for cmd in cmds_firewall_remove():
+            runner.run(cmd, "netsh", quiet_fail=True)
+    else:
+        say("Not: Telefon-Izni.bat ile güvenlik duvarı izni verildiyse, onu da kaldırmak için Kaldir.bat")
+        say("     dosyasına sağ tıklayıp “Yönetici olarak çalıştır”ı seçin.")
     say("Kaldırıldı. Verileriniz (data klasörü) silinmedi.")
     return True
+
+
+def firewall(paths, runner, remove=False):
+    if not runner.dry_run and not is_admin():
+        runner.out("Bu işlem yönetici izni gerektirir: dosyaya sağ tıklayıp “Yönetici olarak çalıştır”ı seçin.")
+        return False
+    if remove:
+        for cmd in cmds_firewall_remove():
+            runner.run(cmd, "netsh", quiet_fail=True)
+        runner.out("Telefon izni kaldırıldı.")
+        return True
+    for cmd in cmds_firewall([paths.python, paths.pythonw]):
+        runner.run(cmd, "netsh", quiet_fail="delete" in cmd)
+    if not runner.failed:
+        runner.out("Telefonlar artık bu bilgisayara bağlanabilir (yalnızca aynı yerel ağdan).")
+    return not runner.failed
 
 
 def stop(paths, runner):
@@ -233,12 +292,9 @@ def stop(paths, runner):
 
 
 def start_server(paths):
-    """Start through the Startup shortcut via Explorer: runs as the logged-in user, not as administrator."""
-    if os.path.exists(paths.startup_lnk):
-        subprocess.Popen(["explorer.exe", paths.startup_lnk])
-    else:
-        subprocess.Popen([paths.pythonw, paths.run_py, "--https", "--background"], cwd=paths.base,
-                         creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
+    flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    subprocess.Popen([paths.pythonw, paths.run_py, "--https", "--background"], cwd=paths.base, creationflags=flags,
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def wait_for_port(port, timeout):
@@ -262,8 +318,10 @@ def open_browser(url):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="python -m app.winsetup", description=__doc__.splitlines()[0])
-    parser.add_argument("action", choices=["install", "uninstall", "stop"])
+    parser.add_argument("action", choices=["install", "uninstall", "stop", "firewall"])
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--remove", action="store_true", help="firewall: remove the permission")
+    parser.add_argument("--no-browser", action="store_true", help="install: don't open the browser")
     args = parser.parse_args(argv)
     if os.name != "nt" and not args.dry_run:
         parser.error("Windows only (use --dry-run to see the steps)")
@@ -273,7 +331,12 @@ def main(argv=None):
         pass
     paths = Paths()
     runner = Runner(dry_run=args.dry_run)
-    ok = {"install": install, "uninstall": uninstall, "stop": stop}[args.action](paths, runner)
+    if args.action == "install":
+        ok = install(paths, runner, open_app=not args.no_browser)
+    elif args.action == "firewall":
+        ok = firewall(paths, runner, remove=args.remove)
+    else:
+        ok = {"uninstall": uninstall, "stop": stop}[args.action](paths, runner)
     return 0 if ok else 1
 
 

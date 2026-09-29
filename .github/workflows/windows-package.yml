@@ -1,0 +1,88 @@
+# Builds the Windows package on a real Windows machine, installs and tests it there (with Windows
+# Defender running), and publishes the zip as a GitHub Release.
+#
+#   Actions tab → "Windows package" → Run workflow        (or push a tag like v1.2.0)
+name: Windows package
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish the zip as a GitHub Release"
+        type: boolean
+        default: true
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write  # creating the Release
+
+jobs:
+  package:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build the package
+        run: |
+          python -m pip install --quiet requests
+          python scripts/build_bundle.py --platform windows --cpu-only
+
+      - name: Install and test it on Windows
+        shell: pwsh
+        env:
+          ERP_NO_MODEL_DOWNLOAD: "1"  # the AI model (several GB) is not needed for the test
+          PYTHONIOENCODING: utf-8
+        run: |
+          Expand-Archive dist/Atolye-windows-x64.zip -DestinationPath C:\
+          C:\Atolye\python\python.exe scripts\smoke_windows.py C:\Atolye
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Windows Defender findings
+        if: always()
+        shell: pwsh
+        run: |
+          try { $hits = Get-MpThreatDetection -ErrorAction Stop | Where-Object { $_.Resources -match 'Atolye' } }
+          catch { "Windows Defender not available on this runner: $_"; exit 0 }
+          (Get-MpComputerStatus | Format-List AMRunningMode, RealTimeProtectionEnabled, BehaviorMonitorEnabled | Out-String)
+          if ($hits) {
+            $hits | Format-List ThreatID, Resources, InitialDetectionTime
+            Write-Error "Windows Defender flagged files of the package"
+            exit 1
+          }
+          "Windows Defender: no detections for the package"
+
+      - name: Keep the zip as a build artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Atolye-windows-x64
+          path: dist/Atolye-windows-x64.zip
+          if-no-files-found: ignore
+
+      - name: Publish as a GitHub Release
+        if: github.event_name == 'push' || inputs.publish
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then tag="$GITHUB_REF_NAME"; else tag="build-$(date -u +%Y%m%d)-$GITHUB_RUN_NUMBER"; fi
+          cd dist
+          sha256sum Atolye-windows-x64.zip > Atolye-windows-x64.zip.sha256
+          sha=$(cut -d' ' -f1 Atolye-windows-x64.zip.sha256)
+          cat > notes.md <<EOF
+          Atölye ERP — Windows paketi (commit ${GITHUB_SHA::7}).
+
+          **Kurulum:** zip'e sağ tıklayın → Özellikler → *Engellemeyi kaldır* → Tümünü ayıkla → \`C:\\\`, sonra \`C:\\Atolye\\Kur.bat\` (yönetici izni gerekmez).
+
+          Bu paket GitHub'ın Windows makinesinde kuruldu ve test edildi (kurulum, uygulama, https sertifikası, güvenlik duvarı izni, durdurma, kaldırma).
+
+          SHA-256: \`$sha\`
+          EOF
+          gh release create "$tag" Atolye-windows-x64.zip Atolye-windows-x64.zip.sha256 \
+            --target "$GITHUB_SHA" --title "Atölye Windows paketi ($tag)" --notes-file notes.md

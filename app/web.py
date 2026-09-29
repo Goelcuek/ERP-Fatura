@@ -5,7 +5,8 @@ from datetime import date, datetime
 from decimal import Decimal
 from functools import wraps
 
-from flask import abort, flash, g, redirect, request, session, url_for
+from flask import abort, flash, g, has_request_context, redirect, request, session, url_for
+from flask.sessions import SecureCookieSessionInterface
 from markupsafe import Markup
 
 from .extensions import db
@@ -176,7 +177,17 @@ def icon(name, cls=""):
     return Markup(f'<svg class="icon {cls}" aria-hidden="true"><use href="#i-{name}"></use></svg>')
 
 
+class _SessionInterface(SecureCookieSessionInterface):
+    """Mark the session cookie Secure per request: https for phones, plain http://localhost on the PC."""
+
+    def get_cookie_secure(self, app):
+        if app.config.get("SESSION_COOKIE_SECURE"):
+            return True
+        return has_request_context() and request.is_secure
+
+
 def init_web(app):
+    app.session_interface = _SessionInterface()
     app.jinja_env.filters.update(
         money=fmt_money,
         num=fmt_num,

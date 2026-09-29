@@ -43,17 +43,24 @@ python scripts/build_bundle.py --platform windows --with-voice  # include offlin
 It can be built on Windows, Linux or macOS. The latest Ollama release is downloaded from GitHub and checked
 against its published SHA-256 checksum (`--ollama-version v0.X.Y` pins one).
 
-On the shop PC: unzip to a permanent folder (e.g. `C:\Atolye`) and double-click **Kur.bat** (asks for administrator
-rights once). It
+**Ready-made package:** GitHub Actions builds it on a Windows machine, installs and tests it there (with Windows
+Defender running) and publishes the zip as a **Release** — Actions → *Windows package* → *Run workflow*, or push a
+tag like `v1.2.0`. The zip is then on the repository's Releases page.
 
-- starts the app at every Windows log-in, hidden (no console window; log in `data\logs\server.log`),
-- puts an **Atölye** shortcut on the desktop (`https://127.0.0.1:8443`),
-- allows ports 8080/8443 in Windows Firewall — for the local network only,
-- makes Windows trust the shop certificate (see [Phones and tablets](#phones-and-tablets)),
-- starts the app and opens the phone set-up page.
+On the shop PC: unzip to a permanent folder (e.g. `C:\Atolye`) and double-click **Kur.bat**. It needs **no
+administrator rights** and does only what an ordinary program does, so antivirus software has nothing to object to
+(no PowerShell, no certificate store, no firewall changes, no self-elevation). For the current Windows user it
 
-**Durdur.bat** stops the background app (e.g. before copying a new version over it), **Kaldir.bat** undoes everything
-Kur.bat did; the `data` folder is never touched. Without installing, **Atolye.bat** / **Atolye-HTTPS.bat** run the
+- starts the app at every log-in, hidden (a shortcut in the user's Startup folder; log in `data\logs\server.log`),
+- puts an **Atölye** shortcut on the desktop: `http://localhost:8080` — on the PC itself browsers treat localhost as
+  secure, so the microphone and the app install work without any certificate,
+- starts the app and opens it in the browser.
+
+When the app first listens on the network, Windows Firewall asks once whether to allow Python — **Allow** lets the
+phones connect. If that question was missed or refused, right-click **Telefon-Izni.bat** → *Run as administrator*
+(adds a rule for ports 8080/8443, local network only). **Durdur.bat** stops the background app (e.g. before copying a
+new version over it), **Kaldir.bat** undoes what Kur.bat did (run it as administrator to also remove the firewall
+rule); the `data` folder is never touched. Without installing, **Atolye.bat** / **Atolye-HTTPS.bat** run the
 app while their console window stays open. The first start downloads the AI model in the background. All data stays
 in the `data` folder. Third-party licences are listed in `THIRD_PARTY_NOTICES.txt`.
 
@@ -296,8 +303,8 @@ its own small certificate authority in `data/tls/` (`ca.crt`, kept for 10 years)
 with it; the server certificate is renewed automatically when the PC's address changes, without the phones having to
 do anything. Each phone installs `ca.crt` once. The CA is **name-constrained** to private network addresses,
 `localhost`, `*.local` and the PC's name, so even if its key were stolen it could not be used to impersonate any
-internet site. Kur.bat adds it to Windows' trusted roots for the browsers on the shop PC. Can't install it on a
-phone? Accept the browser warning instead: everything including the microphone works, only installing it as an
+internet site. Nothing is added to Windows: the shop PC itself uses `http://localhost:8080`, which browsers already
+treat as secure. Can't install it on a phone? Accept the browser warning instead: everything including the microphone works, only installing it as an
 app does not.
 
 **Home-screen app:** a web app manifest, generated icons (company logo, or the monogram such as "ÇT") and a service
@@ -368,7 +375,8 @@ app/
                             # bundled Ollama manager (start/stop, model download)
   services/mobile.py        # phones: addresses, QR codes, app icons, http helper for https mode
   tls.py                    # shop certificate authority + server certificate
-  winsetup.py               # Windows set-up used by Kur.bat / Kaldir.bat / Durdur.bat
+  winsetup.py               # Windows set-up used by Kur.bat / Kaldir.bat / Durdur.bat / Telefon-Izni.bat
+scripts/smoke_windows.py    # installs and tests the built package on Windows (GitHub Actions)
 scripts/build_bundle.py     # Windows package builder (portable Python + app + Ollama)
   routes/                   # Flask blueprints
   templates/, static/       # server-rendered UI, no build step, no CDN (works offline)

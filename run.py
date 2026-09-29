@@ -19,6 +19,8 @@ from app.services.backup import start_scheduler
 
 def start_assistant_model(app):
     """Start the bundled Ollama (if shipped) and download the model on first run, in the background."""
+    if os.environ.get("ERP_NO_MODEL_DOWNLOAD"):  # e.g. automated install tests
+        return
     with app.app_context():
         from app.services.assistant import agent, ollama
 
@@ -144,7 +146,6 @@ def main():
         from app.tls import ensure_cert
 
         cert, key = ensure_cert(app.config["DATA_DIR"])
-        app.config["SESSION_COOKIE_SECURE"] = True
         if http_port and not start_http_helper(app, args.host, http_port, port):
             app.config["SERVE"]["http_port"] = None
         server = wsgi.Server((args.host, port), app, numthreads=args.threads)

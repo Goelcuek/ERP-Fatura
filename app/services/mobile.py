@@ -6,6 +6,7 @@ doesn't trust yet) and redirects everything else to the https address.
 """
 
 import io
+import ipaddress
 import os
 import re
 import unicodedata
@@ -186,12 +187,24 @@ def windows_ico(path, initials, logo=None):
 
 # ---------------------------------------------------------------- http helper (https mode)
 
+def _loopback(addr):
+    try:
+        return ipaddress.ip_address((addr or "").split("%")[0]).is_loopback
+    except ValueError:
+        return False
+
+
 def http_helper(app, https_port):
-    """WSGI app for the plain http port while serving https: phone set-up page + redirects."""
+    """WSGI app for the plain http port while serving https.
+
+    This PC itself (a loopback connection) gets the whole app: browsers treat http://localhost as
+    secure, so the microphone and the app install work without trusting any certificate on the PC.
+    Other devices get the phone set-up page and the certificate, and are redirected to https.
+    """
 
     def wsgi(environ, start_response):
         path = environ.get("PATH_INFO") or "/"
-        if path in HELPER_PATHS or path.startswith(HELPER_PREFIXES):
+        if _loopback(environ.get("REMOTE_ADDR")) or path in HELPER_PATHS or path.startswith(HELPER_PREFIXES):
             return app(environ, start_response)
         host = environ.get("HTTP_HOST") or environ.get("SERVER_NAME") or "localhost"
         host = host.rsplit(":", 1)[0] if not host.endswith("]") else host

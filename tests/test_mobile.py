@@ -1,6 +1,5 @@
 """Phones & tablets: shop certificate authority, set-up page, home-screen app, http helper, Windows set-up."""
 
-import base64
 import io
 import json
 import socket
@@ -218,6 +217,31 @@ def test_http_helper_redirects_to_https_but_serves_setup(app):
     assert calls[-1][0].startswith("200") and body[:1] == b"\x30"
 
 
+def test_http_helper_serves_this_pc_directly(app):
+    """On the PC itself (loopback) the whole app is served over http://localhost — no redirect, no certificate."""
+    helper = mobile.http_helper(app, 8443)
+    calls = []
+    env = {"REQUEST_METHOD": "GET", "PATH_INFO": "/login", "QUERY_STRING": "", "HTTP_HOST": "localhost:8080",
+           "SERVER_NAME": "localhost", "SERVER_PORT": "8080", "wsgi.url_scheme": "http", "wsgi.input": io.BytesIO(),
+           "wsgi.errors": io.StringIO(), "SERVER_PROTOCOL": "HTTP/1.1", "REMOTE_ADDR": "127.0.0.1"}
+    body = b"".join(helper(env, lambda status, headers: calls.append(status)))
+    assert calls[-1].startswith("200") and b"<form" in body
+    helper(dict(env, REMOTE_ADDR="::1"), lambda status, headers: calls.append(status))
+    assert calls[-1].startswith("200")
+    # another device on the LAN is still sent to https
+    helper(dict(env, REMOTE_ADDR="192.168.1.77", HTTP_HOST="192.168.1.50:8080"),
+           lambda status, headers: calls.append((status, dict(headers))))
+    assert calls[-1][0].startswith("302") and calls[-1][1]["Location"].startswith("https://192.168.1.50:8443/")
+
+
+def test_session_cookie_secure_only_over_https(app):
+    c = app.test_client()
+    plain = c.get("/login", base_url="http://localhost").headers.get("Set-Cookie", "")
+    secure = app.test_client().get("/login", base_url="https://localhost").headers.get("Set-Cookie", "")
+    assert "session=" in plain and "Secure" not in plain  # http://localhost on the PC
+    assert "session=" in secure and "Secure" in secure    # phones over https
+
+
 # ---------------------------------------------------------------- Windows set-up
 
 def test_windows_setup_commands():
@@ -227,32 +251,39 @@ def test_windows_setup_commands():
     add = fw[-1]
     assert "remoteip=localsubnet" in add and "localport=8080,8443" in add and "dir=in" in add
     assert r"program=C:\Atölye ERP\python\pythonw.exe" in add
-    assert fw[0][:6] == ["netsh", "advfirewall", "firewall", "delete", "rule", "name=all"]
-    assert winsetup.cmd_trust_ca(r"C:\x\ca.crt") == ["certutil", "-addstore", "-f", "Root", r"C:\x\ca.crt"]
-
-    cmd = winsetup.cmd_shortcut(r"C:\S\Atolye.lnk", r"C:\Ali's\pythonw.exe", '"C:\\A\\run.py" --https', r"C:\A", "i.ico")
-    script = base64.b64decode(cmd[-1]).decode("utf-16-le")
-    assert cmd[-2] == "-EncodedCommand"
-    assert "$s.TargetPath = 'C:\\Ali''s\\pythonw.exe'" in script  # quotes escaped for PowerShell
-    assert "$s.Arguments = '\"C:\\A\\run.py\" --https'" in script
-
-    url = winsetup.url_file_content("https://127.0.0.1:8443/", r"C:\A\data\atolye.ico")
-    assert url.startswith("[InternetShortcut]\r\nURL=https://127.0.0.1:8443/\r\n")
+    assert fw[0] == ["netsh", "advfirewall", "firewall", "delete", "rule", "name=Atolye ERP"]  # only our own rule
+    assert winsetup.cmd_kill(42) == ["taskkill", "/PID", "42", "/T", "/F", "/FI", "IMAGENAME eq pythonw.exe"]
+    url = winsetup.url_file_content(winsetup.LOCAL_URL, r"C:\A\data\atolye.ico")
+    assert url.startswith("[InternetShortcut]\r\nURL=http://localhost:8080/\r\n")
 
 
-def test_windows_setup_dry_run(tmp_path):
+def test_windows_install_is_quiet_for_antivirus(tmp_path):
+    """No elevation, no PowerShell, no certificate store, no firewall change during a normal install."""
     from app import winsetup
 
-    env = {"ProgramData": r"C:\ProgramData", "PUBLIC": r"C:\Users\Public", "ERP_DATA_DIR": str(tmp_path)}
+    env = {"ERP_DATA_DIR": str(tmp_path), "USERPROFILE": r"C:\Users\usta"}
     paths = winsetup.Paths(str(tmp_path), env)
     lines = []
     runner = winsetup.Runner(dry_run=True, out=lines.append)
     assert winsetup.install(paths, runner)
-    text = "\n".join(lines)
-    assert "certutil -addstore -f Root" in text and "netsh advfirewall" in text and "-EncodedCommand" in text
-    assert "StartUp" in paths.startup_lnk and paths.startup_lnk.endswith("Atolye.lnk")
+    text = "\n".join(lines).lower()
+    for word in ("powershell", "certutil", "netsh", "runas", "encodedcommand"):
+        assert word not in text, word
+    norm = lambda p: p.replace("\\", "/")  # noqa: E731 (paths use / when this runs outside Windows)
+    assert norm(paths.startup_lnk).endswith("Startup/Atolye.lnk") and "Users/usta" in norm(paths.startup_lnk)
+    assert norm(paths.desktop_url).endswith("Users/usta/Desktop/Atolye.url")
     assert winsetup.server_args(paths).endswith("--https --background")
+
+
+def test_windows_stop_and_firewall_dry_run(tmp_path):
+    from app import winsetup
+
+    paths = winsetup.Paths(str(tmp_path), {"ERP_DATA_DIR": str(tmp_path)})
+    lines = []
+    runner = winsetup.Runner(dry_run=True, out=lines.append)
     (tmp_path / "server.pid").write_text("4242")
-    lines.clear()
     winsetup.stop(paths, runner)
     assert any("taskkill /PID 4242 /T /F" in line for line in lines)
+    lines.clear()
+    assert winsetup.firewall(paths, runner)
+    assert any("netsh advfirewall firewall add rule" in line for line in lines)

@@ -47,7 +47,11 @@ def test_windows_bundle_offline(tmp_path):
     assert b"--https" in (stage / "Atolye-HTTPS.bat").read_bytes()
     assert "MIT License" in (stage / "THIRD_PARTY_NOTICES.txt").read_text()
     kur = (stage / "Kur.bat").read_bytes()
-    assert b"-Verb RunAs" in kur and b"python\\python.exe -m app.winsetup install" in kur and b"\r\n" in kur
+    assert b"python\\python.exe -m app.winsetup install" in kur and b"\r\n" in kur
+    for bat in stage.glob("*.bat"):  # nothing antivirus behaviour monitors treat as an attack pattern
+        text = bat.read_bytes().lower()
+        assert b"powershell" not in text and b"runas" not in text and b"certutil" not in text, bat.name
+    assert b"app.winsetup firewall" in (stage / "Telefon-Izni.bat").read_bytes()
     assert b"app.winsetup uninstall" in (stage / "Kaldir.bat").read_bytes()
     assert b"app.winsetup stop" in (stage / "Durdur.bat").read_bytes()
     assert (stage / "app/winsetup.py").exists()

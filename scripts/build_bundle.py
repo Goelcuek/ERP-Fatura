@@ -303,7 +303,7 @@ def _install_nuget_python(archive, dest):
 
 
 def install_wheels(target, py_version, with_voice):
-    reqs = ["-r", str(ROOT / "requirements.txt")]
+    reqs = ["-r", str(ROOT / "requirements.txt"), "-r", str(ROOT / "requirements-windows.txt")]
     if with_voice:
         reqs += ["-r", str(ROOT / "requirements-voice.txt")]
     # --no-compile: bytecode made by the build machine's Python would not match the bundled one
@@ -322,18 +322,27 @@ python\\python.exe run.py {args}%*
 pause
 """
 
-# run as administrator (asks via UAC), then python -m app.winsetup <action>
-ADMIN_BAT = """@echo off
+# plain batch files: no elevation, no PowerShell (antivirus behaviour monitors dislike both)
+USER_BAT = """@echo off
 REM {title}
 cd /d "%~dp0"
-net session >nul 2>&1
-if %errorlevel% neq 0 (
-  echo Yonetici izni isteniyor...
-  powershell -NoProfile -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
-  exit /b
-)
 chcp 65001 >nul
 python\\python.exe -m app.winsetup {action}
+echo.
+pause
+"""
+
+# optional, run by the user with right-click > Run as administrator (no self-elevation)
+FIREWALL_BAT = """@echo off
+REM Telefon ve tabletlerin bu bilgisayara baglanabilmesi icin Windows Guvenlik Duvari izni.
+REM Sag tiklayip "Yonetici olarak calistir" secin. Izni kaldirmak icin: Telefon-Izni.bat kaldir
+cd /d "%~dp0"
+chcp 65001 >nul
+if /i "%~1"=="kaldir" (
+  python\\python.exe -m app.winsetup firewall --remove
+) else (
+  python\\python.exe -m app.winsetup firewall
+)
 echo.
 pause
 """
@@ -348,15 +357,16 @@ timeout /t 5
 
 README_TR = (
     "Atolye ERP\r\n\r\n"
-    "KURULUM (onerilen)\r\n"
+    "KURULUM\r\n"
     "1. Bu klasoru kalici bir yere cikarin (or. C:\\Atolye).\r\n"
-    "2. Kur.bat dosyasina cift tiklayin ve yonetici iznini onaylayin. Kur.bat:\r\n"
-    "   - uygulamayi Windows her acildiginda pencere olmadan baslatir,\r\n"
-    "   - masaustune 'Atolye' kisayolu koyar,\r\n"
-    "   - telefon/tabletlerin baglanabilmesi icin guvenlik duvarinda izin verir (yalnizca yerel ag),\r\n"
-    "   - atolyeye ozel sertifikayi bu bilgisayara tanitir (https, uyari yok),\r\n"
-    "   - uygulamayi baslatir ve telefon kurulum sayfasini (QR kodlari) acar.\r\n"
-    "3. Ilk acilista yapay zeka modeli arka planda indirilir (birkac GB, bir kez).\r\n"
+    "2. Kur.bat dosyasina cift tiklayin (yonetici izni gerekmez). Kur.bat:\r\n"
+    "   - uygulamayi Windows'a her girildiginde pencere olmadan baslatir,\r\n"
+    "   - masaustune 'Atolye' kisayolu koyar (http://localhost:8080),\r\n"
+    "   - uygulamayi baslatir ve tarayicida acar.\r\n"
+    "3. Windows guvenlik duvari Python icin izin sorarsa 'Izin ver'e tiklayin (telefonlar icin).\r\n"
+    "   Soru gelmediyse ve telefonlar baglanamiyorsa: Telefon-Izni.bat dosyasina sag tiklayip\r\n"
+    "   'Yonetici olarak calistir'i secin.\r\n"
+    "4. Ilk acilista yapay zeka modeli arka planda indirilir (birkac GB, bir kez).\r\n"
     "   Ilerlemeyi Ayarlar > Asistan sayfasinda gorebilirsiniz.\r\n\r\n"
     "TELEFON / TABLET\r\n"
     "Uygulamada sol alttaki telefon simgesine (veya Ayarlar > Telefon ve tabletler) tiklayin ve QR kodlarini\r\n"
@@ -412,11 +422,12 @@ def build_windows(out, args):
         BAT.format(title="Atolye ERP (https, telefon/tablet mikrofonu icin)", args="--https ").replace("\n", "\r\n"))
     (stage / "THIRD_PARTY_NOTICES.txt").write_text(NOTICES.format(ollama_version=ollama_version))
     (stage / "Kur.bat").write_text(
-        ADMIN_BAT.format(title="Atolye ERP kurulumu: otomatik baslatma, kisayol, guvenlik duvari, sertifika",
-                         action="install").replace("\n", "\r\n"))
+        USER_BAT.format(title="Atolye ERP kurulumu: otomatik baslatma ve masaustu kisayolu (yonetici izni gerekmez)",
+                        action="install").replace("\n", "\r\n"))
     (stage / "Kaldir.bat").write_text(
-        ADMIN_BAT.format(title="Kur.bat'in yaptiklarini geri alir (veriler silinmez)",
-                         action="uninstall").replace("\n", "\r\n"))
+        USER_BAT.format(title="Kur.bat'in yaptiklarini geri alir (veriler silinmez)",
+                        action="uninstall").replace("\n", "\r\n"))
+    (stage / "Telefon-Izni.bat").write_text(FIREWALL_BAT.replace("\n", "\r\n"))
     (stage / "Durdur.bat").write_text(STOP_BAT.replace("\n", "\r\n"))
     (stage / "BENIOKU.txt").write_text(README_TR)
     for cache in list(stage.rglob("__pycache__")):  # never ship bytecode compiled by another Python version
