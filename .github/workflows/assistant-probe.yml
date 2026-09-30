@@ -1,0 +1,52 @@
+# Diagnoses the assistant with a real local model: installs the same Ollama as the Windows package,
+# downloads the model(s), asks workshop questions against the demo data and logs every request and
+# raw model answer (scripts/assistant_probe.py).  Actions tab → "Assistant probe" → Run workflow.
+name: Assistant probe
+
+on:
+  workflow_dispatch:
+    inputs:
+      models:
+        description: "Ollama models, comma separated"
+        default: "gemma4:e2b"
+      ollama_version:
+        description: "Ollama version (same as the Windows package)"
+        default: "v0.34.4"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the app and Ollama
+        run: |
+          python -m pip install --quiet -r requirements.txt zstandard
+          python scripts/build_bundle.py --platform linux --only-ollama --ollama-version "${{ inputs.ollama_version }}"
+          echo "OLLAMA_BIN=$(find vendor/ollama -type f -name ollama -perm -u+x | head -1)" >> "$GITHUB_ENV"
+
+      - name: Start Ollama and download the model(s)
+        env:
+          OLLAMA_HOST: 127.0.0.1:11435
+          OLLAMA_MODELS: ${{ runner.temp }}/models
+        run: |
+          nohup "$OLLAMA_BIN" serve > "$RUNNER_TEMP/ollama.log" 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:11435/api/version && break; sleep 1; done
+          echo
+          IFS=',' read -ra MODELS <<< "${{ inputs.models }}"
+          for m in "${MODELS[@]}"; do "$OLLAMA_BIN" pull "$(echo "$m" | xargs)"; done
+          "$OLLAMA_BIN" list
+
+      - name: Ask the assistant
+        env:
+          PYTHONUNBUFFERED: "1"
+        run: python scripts/assistant_probe.py http://127.0.0.1:11435/v1 "${{ inputs.models }}"
+
+      - name: Ollama server log
+        if: always()
+        run: tail -n 150 "$RUNNER_TEMP/ollama.log" || true
