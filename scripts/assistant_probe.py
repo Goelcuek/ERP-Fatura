@@ -1,6 +1,6 @@
 """Put real workshop questions to the assistant with a local model and log exactly what goes in and out.
 
-    python scripts/assistant_probe.py http://127.0.0.1:11435/v1 gemma4:e2b,qwen3.5:2b
+    python scripts/assistant_probe.py http://127.0.0.1:11435/v1 gemma4:e2b,qwen3.5:2b [off,on]
 
 Uses a throw-away data folder with the demo data. For every model and thinking setting it asks each
 question in a fresh conversation and prints the request (without the tool list), the model server's
@@ -72,6 +72,7 @@ def model_info(base_url, model):
 def main():
     base_url = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:11435/v1"
     models = [m.strip() for m in (sys.argv[2] if len(sys.argv) > 2 else "gemma4:e2b").split(",") if m.strip()]
+    modes = [m.strip() == "on" for m in (sys.argv[3] if len(sys.argv) > 3 else "off,on").split(",") if m.strip()]
 
     from app import create_app
     from app.demo import seed
@@ -89,7 +90,7 @@ def main():
         for model in models:
             print("=" * 100)
             print(f"MODEL {model}: {model_info(base_url, model)}")
-            for thinking in (False, True):
+            for thinking in modes:
                 print("-" * 100)
                 print(f"{model}  thinking={'on' if thinking else 'off'}")
                 for q in QUESTIONS:

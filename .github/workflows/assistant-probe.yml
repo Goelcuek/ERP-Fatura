@@ -9,6 +9,9 @@ on:
       models:
         description: "Ollama models, comma separated"
         default: "gemma4:e2b"
+      thinking:
+        description: "Thinking settings to test: off, on or off,on"
+        default: "off,on"
       ollama_version:
         description: "Ollama version (same as the Windows package)"
         default: "v0.34.4"
@@ -45,7 +48,7 @@ jobs:
       - name: Ask the assistant
         env:
           PYTHONUNBUFFERED: "1"
-        run: python scripts/assistant_probe.py http://127.0.0.1:11435/v1 "${{ inputs.models }}"
+        run: python scripts/assistant_probe.py http://127.0.0.1:11435/v1 "${{ inputs.models }}" "${{ inputs.thinking }}"
 
       - name: Ollama server log
         if: always()

@@ -7,6 +7,7 @@ Conversation state lives in AssistantConversation:
 """
 
 import json
+import re
 import uuid
 from datetime import date, datetime
 
@@ -43,6 +44,15 @@ Rules:
 - After a change, say briefly what was done and the order or invoice number."""
 
 FINAL_NUDGE = "Now give your short answer to my question, using the tool results above."
+ACT_NUDGE = "Do not describe it: call the tool now."
+# "I'm looking it up" instead of looking it up (the probe caught Gemma doing this)
+ANNOUNCES_LOOKUP = re.compile(r"\w+(?:ıyorum|iyorum|uyorum|üyorum|acağım|eceğim)\b|\bI(?:'m| am| will|'ll) "
+                              r"(?:now )?(?:check|look|search|find|call|list)", re.I)
+
+
+def announces_lookup(text, tool_names):
+    """A reply that only says what the model is about to look up, without doing it."""
+    return bool(text) and (any(n in text for n in tool_names) or bool(ANNOUNCES_LOOKUP.search(text)))
 
 # statuses a job can be in before each command, most likely first (used to pick "the" job)
 FROM_STATUSES = {
@@ -352,7 +362,9 @@ class Session:
         if cfg["bundled"] and cfg["server"] == "auto" and not mgr.running(ollama.api_root(cfg["effective_base_url"])):
             mgr.start(wait=20)  # the bundled server stopped (e.g. after sleep): bring it back
         specs = tools.specs()
-        for _step in range(MAX_STEPS):
+        names = [t["name"] for t in specs]
+        nudged = False
+        for step in range(MAX_STEPS):
             try:
                 turn = self.llm.chat(self._trimmed(), specs)
             except LLMError as e:
@@ -360,6 +372,10 @@ class Session:
                 self.say(_(str(e)), role="error")
                 return
             self.messages.append(turn.history_message())
+            if not turn.tool_calls and step == 0 and not nudged and announces_lookup(turn.text, names):
+                nudged = True  # once: tell it to act; the announcement is not shown
+                self.messages.append({"role": "user", "content": ACT_NUDGE})
+                continue
             if not turn.tool_calls:
                 # some models end with thinking only and no words: ask once for the short answer
                 self.say(turn.text or self._final_answer() or _("Done."))

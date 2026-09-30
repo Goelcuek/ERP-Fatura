@@ -488,3 +488,18 @@ def test_empty_final_answer_is_asked_for_once(app, shop):
 def test_thinking_is_on_by_default(app):
     with app.app_context():
         assert Setting.get("assistant.thinking") is True
+
+
+def test_announced_lookup_is_turned_into_action(app, shop):
+    """Gemma: "Anadolu Metal'in faturalarını buluyorum." and nothing else — told once to act."""
+    llm = FakeLLM(Turn(text="Anadolu Metal'in ödenmemiş faturalarını buluyorum."),
+                  Turn(tool_calls=[ToolCall(id="c1", name="business_summary", arguments={}, raw_arguments="{}")]),
+                  Turn(text="Bu ay satışlar iyi."))
+    with app.test_request_context():
+        res = session(app, llm=llm).message("anadolu metalin ödenmemiş faturaları hangileri acaba")
+    assert texts(res)[-1] == "Bu ay satışlar iyi."
+    assert "buluyorum" not in " ".join(texts(res))  # the announcement is not shown
+    assert llm.calls[1][-1]["content"] == agent.ACT_NUDGE
+    assert agent.announces_lookup("find_invoices with customer=Anadolu Metal", ["find_invoices"])
+    assert not agent.announces_lookup("Anadolu Metal'in borcu 8.490,00 ₺.", ["find_invoices"])
+    assert not agent.announces_lookup("Merhaba! Size nasıl yardımcı olabilirim?", ["find_invoices"])
