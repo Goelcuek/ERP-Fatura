@@ -90,7 +90,7 @@ class Setting(db.Model):
         "assistant.model": "gemma4:e2b",
         "assistant.api_key": "",
         "assistant.temperature": 0.2,
-        "assistant.thinking": False,  # let reasoning models think before answering (slower on a CPU)
+        "assistant.thinking": True,  # Gemma 4 only uses tools when it may think first (probe, v0.34.4)
         "assistant.timeout": 120,
         "voice.engine": "auto",  # auto | browser | local | off
         "voice.lang": "tr-TR",

@@ -31,14 +31,18 @@ SYSTEM_PROMPT = """You are the assistant inside the workshop software of {compan
 You help the staff by calling tools.
 Rules:
 - Always answer in {language}, in one or two short sentences. Replies may be read aloud: no tables, no markdown.
-- Use tools for facts. Never invent order numbers, amounts or ids; look them up first.
+- Call the tools yourself, right away. Never say you will look something up or ask the user to wait.
+- Use tools for facts. Never invent order numbers, amounts or ids. Pass customer names to tools, not guessed ids.
 - "This job" means the order on the user's screen (see Context). If there is none, use find_orders with mine=true.
+  Jobs due today or late: find_orders with due=today. How much a customer owes: get_customer with the name.
 - If several records match, ask which one, naming at most three by number.
 - Status words: finished, done, fixed, ready -> ready. Customer took it -> delivered. Started -> in_repair.
   Waiting for parts -> awaiting_parts. Sent a price quote -> awaiting_approval.
 - issue_invoice, record_payment, record_expense, adjust_stock and create_customer are confirmed by the user in the
   app: call the tool, do not ask for confirmation in text.
 - After a change, say briefly what was done and the order or invoice number."""
+
+FINAL_NUDGE = "Now give your short answer to my question, using the tool results above."
 
 # statuses a job can be in before each command, most likely first (used to pick "the" job)
 FROM_STATUSES = {
@@ -329,6 +333,15 @@ class Session:
             msgs = msgs[1:]
         return [{"role": "system", "content": self._system()}] + msgs
 
+    def _final_answer(self):
+        try:
+            turn = self.llm.chat(self._trimmed() + [{"role": "user", "content": FINAL_NUDGE}], [])
+        except LLMError:
+            return ""
+        if turn.text:
+            self.messages[-1] = turn.history_message()  # keep the words, not the empty reply
+        return turn.text
+
     def _run_llm(self):
         dl = ollama.manager().download.snapshot()
         if dl["state"] == "downloading":
@@ -348,7 +361,8 @@ class Session:
                 return
             self.messages.append(turn.history_message())
             if not turn.tool_calls:
-                self.say(turn.text or _("Done."))
+                # some models end with thinking only and no words: ask once for the short answer
+                self.say(turn.text or self._final_answer() or _("Done."))
                 return
             if turn.text:
                 self.say(turn.text)

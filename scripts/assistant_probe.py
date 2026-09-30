@@ -81,7 +81,7 @@ def main():
     from app.services.assistant.llm import OpenAICompatibleBackend
 
     app = create_app()
-    with app.app_context():
+    with app.test_request_context():  # like a real request (tools build links to pages)
         seed()
         user = User.query.filter_by(username="demo").one()
         spec_chars = len(json.dumps(tools.specs(), ensure_ascii=False))

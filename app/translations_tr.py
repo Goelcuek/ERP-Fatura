@@ -1112,5 +1112,5 @@ TR = {
     'e.g.': 'örn.',
     'Too many failed attempts. Please wait {n} seconds and try again.': 'Çok fazla başarısız deneme. Lütfen {n} saniye bekleyip tekrar deneyin.',
     'Let the model think before answering': 'Model cevap vermeden önce düşünsün',
-    'Can be a little more accurate, but on a normal computer each answer takes several seconds longer. Leave off unless answers are often wrong.': 'Biraz daha isabetli olabilir, ancak normal bir bilgisayarda her cevap birkaç saniye daha uzun sürer. Cevaplar sık sık yanlış olmadıkça kapalı bırakın.',
+    'Recommended. Gemma 4 only looks things up in the app when it may think first. Off answers faster, but the assistant may then only describe what it would do.': 'Önerilir. Gemma 4 uygulamada bilgi arayabilmek için önce düşünmeye ihtiyaç duyar. Kapalıyken cevaplar daha hızlıdır, ancak asistan yapacağı işi sadece anlatabilir.',
 }

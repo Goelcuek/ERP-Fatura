@@ -113,6 +113,27 @@ def get_contact(cid):
     return c
 
 
+def resolve_customer(customer_id=None, customer=None):
+    """A customer by name (preferred: small models guess ids) or by id."""
+    name = (customer or "").strip()
+    if name:
+        like = f"%{name}%"
+        rows = Contact.query.filter(Contact.archived.is_(False), or_(
+            Contact.name.ilike(like), Contact.tax_id.like(like), Contact.phone.like(like))).limit(6).all()
+        if not rows:  # "Anadolu Metal Sanayi" vs "Anadolu Metal Sanayi Ltd. Şti.": try the first words
+            first = " ".join(name.split()[:2])
+            rows = Contact.query.filter(Contact.archived.is_(False), Contact.name.ilike(f"%{first}%")).limit(6).all()
+        if len(rows) == 1:
+            return rows[0]
+        if not rows:
+            raise ToolError(f"No customer matches “{name}”. Ask the user for the exact name.")
+        raise ToolError("Several customers match: " + "; ".join(c.name for c in rows)
+                        + ". Ask the user which one.")
+    if customer_id not in (None, ""):
+        return get_contact(customer_id)
+    raise ToolError("customer (name) is required")
+
+
 def get_invoice(iid):
     inv = db.session.get(Invoice, _int(iid, "invoice_id"))
     if inv is None:
@@ -140,12 +161,25 @@ STATUS_ENUM = list(ServiceOrder.STATUSES)
 # ---------------------------------------------------------------- read tools
 
 
-@tool("find_orders", "Find service (repair) orders. Use mine=true for the current user's jobs.",
+@tool("find_orders", "Find service (repair) orders. due=today: promised for today or already late; "
+      "due=late: past the promised date. mine=true only when the user asks for their own jobs.",
       {"query": {"type": "string", "description": "order no, customer, brand, model or serial"},
        "status": {"type": "string", "enum": ["open"] + STATUS_ENUM + ["all"]},
+       "due": {"type": "string", "enum": ["today", "late"]},
        "mine": {"type": "boolean"}})
-def find_orders(ctx, query="", status="open", mine=False):
+def find_orders(ctx, query="", status="open", mine=False, due=None):
+    result = _find_orders(ctx, query, status, mine, due)
+    if mine and not result["count"]:  # nothing assigned to this user (e.g. the owner): show everyone's
+        result = {**_find_orders(ctx, query, status, False, due), "note": "no jobs assigned to this user; showing all"}
+    return result
+
+
+def _find_orders(ctx, query, status, mine, due):
     q = ServiceOrder.query.join(Contact)
+    if due in ("today", "late"):
+        today = date.today()
+        q = q.filter(ServiceOrder.promised_date.isnot(None),
+                     ServiceOrder.promised_date <= today if due == "today" else ServiceOrder.promised_date < today)
     if status in (None, "", "open"):
         q = q.filter(ServiceOrder.status.in_(ServiceOrder.OPEN))
     elif status != "all":
@@ -186,10 +220,12 @@ def find_customers(ctx, query):
                                                "city": c.city} for c in rows]}
 
 
-@tool("get_customer", "A customer's details, balance, open invoices and recent orders.",
-      {"customer_id": {"type": "integer"}}, ["customer_id"])
-def get_customer(ctx, customer_id):
-    c = get_contact(customer_id)
+@tool("get_customer", "A customer's balance (how much they owe), open invoices and recent orders. "
+      "Pass the customer's name.",
+      {"customer": {"type": "string", "description": "customer name, e.g. Anadolu Metal"},
+       "customer_id": {"type": "integer", "description": "only if known from an earlier result"}})
+def get_customer(ctx, customer=None, customer_id=None):
+    c = resolve_customer(customer_id, customer)
     ctx.link(c.name, url_for("contacts.view", cid=c.id))
     bal = c.balance()
     open_inv = [invoice_brief(i) for i in c.invoices if i.open_amount > 0]
@@ -211,13 +247,16 @@ def find_parts(ctx, query):
                                           for p in rows]}
 
 
-@tool("find_invoices", "Find invoices. status: unpaid, overdue, draft or all.",
-      {"customer_id": {"type": "integer"},
+@tool("find_invoices", "Find invoices, optionally of one customer (pass the name). "
+      "status: unpaid, overdue, draft or all.",
+      {"customer": {"type": "string", "description": "customer name"},
+       "customer_id": {"type": "integer", "description": "only if known from an earlier result"},
        "status": {"type": "string", "enum": ["unpaid", "overdue", "draft", "all"]}})
-def find_invoices(ctx, customer_id=None, status="unpaid"):
+def find_invoices(ctx, customer=None, customer_id=None, status="unpaid"):
     q = Invoice.query
-    if customer_id:
-        q = q.filter(Invoice.contact_id == _int(customer_id, "customer_id"))
+    c = resolve_customer(customer_id, customer) if (customer or customer_id) else None
+    if c is not None:
+        q = q.filter(Invoice.contact_id == c.id)
     if status == "draft":
         q = q.filter(Invoice.status == "draft")
     elif status in ("unpaid", "overdue"):
@@ -314,13 +353,16 @@ def add_order_parts(ctx, order, quantity, part_id=None, description="", unit_pri
             "order_total_incl_vat": fmt_money(o.totals().payable)}
 
 
-@tool("create_order", "Open a new service order when a customer drops off a device. Look up customer_id first.",
-      {"customer_id": {"type": "integer"}, "device_type": {"type": "string"}, "brand": {"type": "string"},
+@tool("create_order", "Open a new service order when a customer drops off a device. Pass the customer's name.",
+      {"customer": {"type": "string", "description": "customer name"},
+       "customer_id": {"type": "integer", "description": "only if known from an earlier result"},
+       "device_type": {"type": "string"}, "brand": {"type": "string"},
        "model": {"type": "string"}, "serial_no": {"type": "string"}, "complaint": {"type": "string"},
        "accessories": {"type": "string"}},
-      ["customer_id", "device_type"], risk="write")
-def create_order(ctx, customer_id, device_type, brand="", model="", serial_no="", complaint="", accessories=""):
-    c = get_contact(customer_id)
+      ["device_type"], risk="write")
+def create_order(ctx, device_type, customer=None, customer_id=None, brand="", model="", serial_no="", complaint="",
+                 accessories=""):
+    c = resolve_customer(customer_id, customer)
     o = workshop.create_order(c, ctx.user, source="assistant", device_type=device_type.strip(), brand=brand.strip(),
                               model=model.strip(), serial_no=serial_no.strip(), complaint=complaint.strip(),
                               accessories=accessories.strip())

@@ -49,7 +49,7 @@
         <div class="field span-2"><label>{{ _('API key (optional)') }}</label><input type="password" name="api_key" autocomplete="off" placeholder="{{ '••••••••  ' ~ _('(saved — leave empty to keep)') if s.api_key else _('Not needed for Ollama') }}"></div>
       </div>
       <label class="check"><input type="checkbox" name="thinking" value="1" {{ 'checked' if s.thinking }}>
-        <span>{{ _('Let the model think before answering') }}<small>{{ _('Can be a little more accurate, but on a normal computer each answer takes several seconds longer. Leave off unless answers are often wrong.') }}</small></span></label>
+        <span>{{ _('Let the model think before answering') }}<small>{{ _('Recommended. Gemma 4 only looks things up in the app when it may think first. Off answers faster, but the assistant may then only describe what it would do.') }}</small></span></label>
       <label class="check"><input type="checkbox" name="auto_download" value="1" {{ 'checked' if s.auto_download }}>
         <span>{{ _('Download the model automatically when it is missing') }}<small>{{ _('Small models are a few GB. The download runs in the background; workshop commands work meanwhile.') }}</small></span></label>
       <p class="small muted" style="margin-top:4px">{{ _('A 2B model needs about 3 GB of free memory and runs on the processor; a graphics card makes it faster but is not required. Larger models (4B–8B) understand better but answer more slowly.') }}</p>

@@ -17,6 +17,8 @@ import requests
 
 THINK = re.compile(r"<think>.*?</think>\s*", re.S)
 TEXT_TOOL_CALL = re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.S)
+PY_CALL = re.compile(r"^`*\s*(?:print\()?([a-z_]+)\((.*)\)\)?\s*`*$", re.S)  # name(a=1, b='x') alone in the reply
+PY_ARG = re.compile(r"(\w+)\s*=\s*('(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\"|[^,]+)")
 
 
 class LLMError(Exception):
@@ -61,7 +63,35 @@ def _loads(s):
         return None
 
 
-def parse_message(message):
+def _py_value(v):
+    v = v.strip()
+    if len(v) >= 2 and v[0] == v[-1] and v[0] in "'\"":
+        return v[1:-1]
+    low = v.lower()
+    if low in ("true", "false"):
+        return low == "true"
+    if low in ("none", "null"):
+        return None
+    try:
+        return int(v)
+    except ValueError:
+        try:
+            return float(v)
+        except ValueError:
+            return v
+
+
+def _python_style_call(content, tool_names):
+    """Some models (e.g. Gemma) sometimes write the call instead of making it: find_orders(status='ready')."""
+    m = PY_CALL.match(content.strip())
+    if not m or m.group(1) not in tool_names:
+        return None
+    args = {k: _py_value(v) for k, v in PY_ARG.findall(m.group(2))}
+    return ToolCall(id="call_" + uuid.uuid4().hex[:12], name=m.group(1), arguments=args,
+                    raw_arguments=json.dumps(args, ensure_ascii=False))
+
+
+def parse_message(message, tool_names=()):
     """Turn an OpenAI-format assistant message into a Turn."""
     content = message.get("content") or ""
     if isinstance(content, list):  # some servers return content parts
@@ -92,6 +122,10 @@ def parse_message(message):
             content = TEXT_TOOL_CALL.sub("", content)
             if content.strip().startswith("{"):
                 content = ""
+        elif tool_names:
+            call = _python_style_call(content, tool_names)
+            if call:
+                calls, content = [call], ""
     return Turn(text=content.strip(), tool_calls=calls)
 
 
@@ -141,7 +175,7 @@ class OpenAICompatibleBackend:
             message = data["choices"][0]["message"]
         except (ValueError, KeyError, IndexError):
             raise LLMError("Unexpected answer from the model server.")
-        turn = parse_message(message)
+        turn = parse_message(message, [t["name"] for t in tools or []])
         turn.usage = data.get("usage") or {}
         return turn
 

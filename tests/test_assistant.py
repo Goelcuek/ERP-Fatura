@@ -419,3 +419,72 @@ def test_microphone_hidden_only_when_voice_is_off(app, client):
         Setting.set("voice.engine", "off")
         db.session.commit()
     assert "data-asst-mic" not in client.get("/assistant/").get_data(as_text=True)
+
+
+# ---------------------------------------------------------------- lessons from the probe with real models
+
+def test_text_written_tool_call_is_used():
+    """Gemma sometimes writes the call instead of making it."""
+    t = parse_message({"content": "find_orders(mine=true, status='ready')"}, ["find_orders"])
+    assert t.text == "" and t.tool_calls[0].name == "find_orders"
+    assert t.tool_calls[0].arguments == {"mine": True, "status": "ready"}
+    t = parse_message({"content": "`get_customer(customer=\"Anadolu Metal\")`"}, ["get_customer"])
+    assert t.tool_calls[0].arguments == {"customer": "Anadolu Metal"}
+    assert not parse_message({"content": "print(hello)"}, ["find_orders"]).tool_calls  # not one of our tools
+    assert not parse_message({"content": "Bugün 3 iş var (2 hazır)."}, ["find_orders"]).tool_calls
+
+
+def test_tools_take_customer_names_instead_of_guessed_ids(app, shop):
+    from app.services.assistant import tools
+
+    with app.test_request_context():
+        ctx = tools.Context(User.query.filter_by(username="staff").one())
+        # longer than the stored name: matched by its first words
+        assert tools.TOOLS["get_customer"].fn(ctx, customer="Anadolu Metal Sanayi")["name"] == "Anadolu Metal"
+        res = tools.TOOLS["find_invoices"].fn(ctx, customer="anadolu", status="all")
+        assert all(i["customer"] == "Anadolu Metal" for i in res["invoices"])
+        with pytest.raises(tools.ToolError, match="No customer"):
+            tools.TOOLS["get_customer"].fn(ctx, customer="Yok Böyle Firma")
+        db.session.add(Contact(name="Anadolu Metal Döküm"))
+        db.session.flush()
+        with pytest.raises(tools.ToolError, match="Several customers"):
+            tools.TOOLS["get_customer"].fn(ctx, customer="Anadolu")
+        o = tools.TOOLS["create_order"].fn(ctx, device_type="Matkap", customer="Metal Döküm")
+        assert ServiceOrder.query.filter_by(number=o["order"]).one().contact.name == "Anadolu Metal Döküm"
+
+
+def test_find_orders_due_today_and_mine_falls_back(app, shop):
+    from datetime import timedelta
+
+    from app.services.assistant import tools
+
+    with app.test_request_context():
+        today = date.today()
+        for oid, days in zip(shop["orders"], (-1, 0, 3)):
+            db.session.get(ServiceOrder, oid).promised_date = today + timedelta(days=days)
+        db.session.flush()
+        admin = tools.Context(User.query.filter_by(username="admin").one())
+        assert tools.TOOLS["find_orders"].fn(admin, due="today")["count"] == 2  # today + already late
+        assert tools.TOOLS["find_orders"].fn(admin, due="late")["count"] == 1
+        res = tools.TOOLS["find_orders"].fn(admin, mine=True)  # the owner has no jobs of their own
+        assert res["count"] == 3 and "showing all" in res["note"]
+        tech = tools.Context(User.query.filter_by(username="staff").one())
+        res = tools.TOOLS["find_orders"].fn(tech, mine=True)
+        assert res["count"] == 1 and "note" not in res
+
+
+def test_empty_final_answer_is_asked_for_once(app, shop):
+    llm = FakeLLM(Turn(tool_calls=[ToolCall(id="c1", name="business_summary", arguments={}, raw_arguments="{}")]),
+                  Turn(text=""),  # thought, but said nothing
+                  Turn(text="Bu ay satışlar iyi."))
+    with app.test_request_context():
+        with app.app_context():
+            Setting.set("assistant.use_llm", True)
+        res = session(app, llm=llm).message("bu ay satışlar nasıl gidiyor acaba")
+    assert texts(res)[-1] == "Bu ay satışlar iyi."
+    assert llm.calls[-1][-1]["content"] == agent.FINAL_NUDGE
+
+
+def test_thinking_is_on_by_default(app):
+    with app.app_context():
+        assert Setting.get("assistant.thinking") is True
